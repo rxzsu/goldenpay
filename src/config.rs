@@ -1,7 +1,8 @@
+use std::fmt;
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct GoldenPayConfig {
     pub golden_key: String,
     pub base_url: String,
@@ -10,6 +11,20 @@ pub struct GoldenPayConfig {
     pub retry: RetryPolicy,
     pub proxy: Option<String>,
     pub state_path: Option<PathBuf>,
+}
+
+impl fmt::Debug for GoldenPayConfig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GoldenPayConfig")
+            .field("golden_key", &"***")
+            .field("base_url", &self.base_url)
+            .field("user_agent", &self.user_agent)
+            .field("poll_interval", &self.poll_interval)
+            .field("retry", &self.retry)
+            .field("proxy", &self.proxy)
+            .field("state_path", &self.state_path)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone)]

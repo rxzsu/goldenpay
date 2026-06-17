@@ -1,9 +1,12 @@
 use crate::models::{ChatMessage, OrderInfo};
 use std::collections::{HashMap, HashSet};
 
+/// Configuration options for [`GoldenPayBot`](crate::GoldenPayBot).
 #[derive(Debug, Clone)]
 pub struct BotOptions {
+    /// If true, messages authored by the bot's user are not emitted.
     pub ignore_own_messages: bool,
+    /// If true, new orders also emit their initial chat messages.
     pub emit_messages_for_new_orders: bool,
 }
 

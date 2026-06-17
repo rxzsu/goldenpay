@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::Mutex;
 
+/// Persistence adapter for bot state (seen orders and messages).
 #[async_trait]
 pub trait StateStore: Send + Sync {
     async fn load(&self) -> Result<BotState, GoldenPayError>;

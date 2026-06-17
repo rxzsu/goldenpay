@@ -16,6 +16,10 @@ use reqwest::header::{ACCEPT, CONTENT_TYPE, COOKIE, ORIGIN, REFERER, SET_COOKIE,
 use reqwest::{Client, Response};
 use serde_json::{Value, json};
 
+/// A reusable HTTP client for the FunPay API.
+///
+/// Created via [`GoldenPay::new`], it holds a connection pool and configuration.
+/// Call [`connect`](GoldenPay::connect) to obtain an authenticated session.
 #[derive(Clone)]
 pub struct GoldenPay {
     http: Client,
@@ -23,6 +27,10 @@ pub struct GoldenPay {
     urls: Urls,
 }
 
+/// An authenticated FunPay session tied to a seller account.
+///
+/// Provides all API operations: fetching orders, sending messages,
+/// editing offers, calculating prices, and browsing the marketplace.
 #[derive(Clone)]
 pub struct GoldenPaySession {
     http: Client,
@@ -33,6 +41,8 @@ pub struct GoldenPaySession {
 
 impl GoldenPay {
     /// Creates a reusable client from configuration.
+    ///
+    /// Returns `MissingGoldenKey` if the golden key is empty.
     pub fn new(config: GoldenPayConfig) -> Result<Self, GoldenPayError> {
         if config.golden_key.trim().is_empty() {
             return Err(GoldenPayError::MissingGoldenKey);
@@ -57,6 +67,8 @@ impl GoldenPay {
 
     /// Establishes an authenticated session and fetches seller metadata.
     pub async fn connect(&self) -> Result<GoldenPaySession, GoldenPayError> {
+        tracing::info!("connecting to FunPay");
+
         let response = self
             .request_with_retry(|| {
                 self.http
@@ -72,6 +84,8 @@ impl GoldenPay {
         let set_cookies = collect_set_cookies(&response);
         let body = response.text().await?;
         let user = parse_user(&body, &set_cookies)?;
+
+        tracing::info!(username = %user.username, "connected");
 
         Ok(GoldenPaySession {
             http: self.http.clone(),
@@ -95,10 +109,12 @@ impl GoldenPaySession {
         &self.user
     }
 
+    /// Returns the polling interval between event checks.
     pub fn poll_interval(&self) -> std::time::Duration {
         self.config.poll_interval
     }
 
+    /// Returns the runtime configuration.
     pub fn config(&self) -> &GoldenPayConfig {
         &self.config
     }
@@ -396,9 +412,13 @@ where
                 );
 
                 if !retryable || attempt == config.retry.max_attempts {
+                    if attempt > 1 {
+                        tracing::warn!(attempt, error = %error, "request failed, no more retries");
+                    }
                     return Err(error);
                 }
 
+                tracing::warn!(attempt, error = %error, "request failed, retrying");
                 retry_sleep(attempt, config.retry.base_delay).await;
             }
         }

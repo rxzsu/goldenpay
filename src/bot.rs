@@ -4,19 +4,30 @@ use crate::event::{BotOptions, EventStream, MessageFilter};
 use crate::models::{BotState, ChatMessage, OrderInfo};
 use crate::storage::{JsonStateStore, MemoryStateStore, StateStore};
 use std::sync::Arc;
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
+use tokio_util::sync::CancellationToken;
 
+/// An event emitted by [`GoldenPayBot`] during a poll cycle.
 #[derive(Debug, Clone)]
 pub enum GoldenPayEvent {
+    /// A previously unseen order appeared on the trade page.
     NewOrder(OrderInfo),
+    /// A new message was received in an active chat.
     NewMessage(ChatMessage),
 }
 
+/// A polling bot that monitors new orders and messages.
+///
+/// Call [`run`](GoldenPayBot::run) to start the event loop.
+/// Supports graceful shutdown via [`CancellationToken`](tokio_util::sync::CancellationToken).
 pub struct GoldenPayBot {
     session: GoldenPaySession,
     store: Arc<dyn StateStore>,
     stream: EventStream,
     options: BotOptions,
+    cancel_token: CancellationToken,
+    concurrency_limit: Arc<Semaphore>,
 }
 
 impl GoldenPayBot {
@@ -32,6 +43,8 @@ impl GoldenPayBot {
             store,
             stream: EventStream::default(),
             options: BotOptions::default(),
+            cancel_token: CancellationToken::new(),
+            concurrency_limit: Arc::new(Semaphore::new(5)),
         }
     }
 
@@ -41,12 +54,32 @@ impl GoldenPayBot {
             store,
             stream: EventStream::default(),
             options: BotOptions::default(),
+            cancel_token: CancellationToken::new(),
+            concurrency_limit: Arc::new(Semaphore::new(5)),
         }
     }
 
     pub fn with_options(mut self, options: BotOptions) -> Self {
         self.options = options;
         self
+    }
+
+    /// Associates a cancellation token for graceful shutdown.
+    /// When cancelled, the bot's [`run`](GoldenPayBot::run) loop exits cleanly.
+    pub fn with_cancellation_token(mut self, token: CancellationToken) -> Self {
+        self.cancel_token = token;
+        self
+    }
+
+    /// Sets the maximum number of concurrent API requests (default: 5).
+    pub fn with_concurrency_limit(mut self, max_concurrent: usize) -> Self {
+        self.concurrency_limit = Arc::new(Semaphore::new(max_concurrent));
+        self
+    }
+
+    /// Triggers a graceful shutdown of the bot.
+    pub fn cancel(&self) {
+        self.cancel_token.cancel();
     }
 
     pub fn session(&self) -> &GoldenPaySession {
@@ -57,6 +90,7 @@ impl GoldenPayBot {
         let state = self.store.load().await?;
         self.stream.seen_orders = state.seen_orders.into_iter().collect();
         self.stream.seen_messages = state.seen_messages;
+        tracing::info!(orders = %self.stream.seen_orders.len(), "state loaded");
         Ok(())
     }
 
@@ -71,17 +105,21 @@ impl GoldenPayBot {
 
     pub async fn bootstrap(&mut self) -> Result<(), GoldenPayError> {
         let orders = self.session.fetch_orders().await?;
+        tracing::info!(count = %orders.len(), "bootstrapping existing orders");
 
         for order in &orders {
             self.stream.seen_orders.insert(order.id.clone());
         }
 
         let session = self.session.clone();
+        let sem = self.concurrency_limit.clone();
         let mut set = JoinSet::new();
         for order in &orders {
             let chat_id = order.chat_id.clone();
             let session = session.clone();
+            let sem = sem.clone();
             set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
                 let messages = session.fetch_chat_messages(&chat_id).await?;
                 Ok::<_, GoldenPayError>((chat_id, messages))
             });
@@ -95,6 +133,7 @@ impl GoldenPayBot {
             }
         }
 
+        tracing::info!("bootstrap complete");
         self.save_state().await
     }
 
@@ -108,7 +147,6 @@ impl GoldenPayBot {
                 .then_some(self.session.user().id),
         };
 
-        // Phase 1: classify orders — identify new orders and determine which chats need messages
         let mut emit_chats = Vec::new();
         let mut mark_chats = Vec::new();
         for order in &orders {
@@ -127,13 +165,15 @@ impl GoldenPayBot {
             }
         }
 
-        // Phase 2: fetch messages concurrently for all needed chats
         let session = self.session.clone();
+        let sem = self.concurrency_limit.clone();
         let mut set = JoinSet::new();
         for chat_id in &emit_chats {
             let session = session.clone();
             let cid = chat_id.clone();
+            let sem = sem.clone();
             set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
                 let r = session.fetch_chat_messages(&cid).await;
                 (cid, r, true)
             });
@@ -141,13 +181,14 @@ impl GoldenPayBot {
         for chat_id in &mark_chats {
             let session = session.clone();
             let cid = chat_id.clone();
+            let sem = sem.clone();
             set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
                 let r = session.fetch_chat_messages(&cid).await;
                 (cid, r, false)
             });
         }
 
-        // Phase 3: process results as they complete
         while let Some(joined) = set.join_next().await {
             let Ok((chat_id, result, should_emit)) = joined else { continue; };
             let Ok(messages) = result else { continue; };
@@ -166,6 +207,7 @@ impl GoldenPayBot {
         }
 
         self.save_state().await?;
+        tracing::debug!(events = %events.len(), "poll cycle complete");
         Ok(events)
     }
 
@@ -174,12 +216,22 @@ impl GoldenPayBot {
         F: FnMut(GoldenPayEvent, &GoldenPaySession) -> Fut,
         Fut: std::future::Future<Output = Result<(), GoldenPayError>>,
     {
+        tracing::info!("bot started");
+        let token = self.cancel_token.clone();
         loop {
-            for event in self.poll_once().await? {
-                handler(event, &self.session).await?;
+            tokio::select! {
+                _ = token.cancelled() => {
+                    tracing::info!("bot received shutdown signal");
+                    return Ok(());
+                }
+                result = self.poll_once() => {
+                    let events = result?;
+                    for event in events {
+                        handler(event, &self.session).await?;
+                    }
+                    tokio::time::sleep(self.session.poll_interval()).await;
+                }
             }
-
-            tokio::time::sleep(self.session.poll_interval()).await;
         }
     }
 }

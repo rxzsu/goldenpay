@@ -1,3 +1,8 @@
+//! Production-oriented Rust SDK for FunPay automation.
+//!
+//! Provides session management, order polling, delivery automation,
+//! offer editing, and chat messaging for the FunPay marketplace.
+
 pub mod automation;
 pub mod bot;
 pub mod client;

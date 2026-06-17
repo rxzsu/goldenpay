@@ -1,14 +1,30 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Authenticated user metadata extracted from the home page.
+#[derive(Clone, Serialize, Deserialize)]
 pub struct UserInfo {
     pub id: i64,
     pub username: String,
+    /// CSRF token required for state-modifying requests.
     pub csrf_token: String,
+    /// PHP session ID, if one was set during connect.
     pub phpsessid: Option<String>,
 }
 
+impl fmt::Debug for UserInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UserInfo")
+            .field("id", &self.id)
+            .field("username", &self.username)
+            .field("csrf_token", &"***")
+            .field("phpsessid", &"***")
+            .finish()
+    }
+}
+
+/// A single chat message.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub id: i64,
@@ -17,6 +33,7 @@ pub struct ChatMessage {
     pub text: Option<String>,
 }
 
+/// A compact order entry from the trade page list.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct OrderInfo {
     pub id: String,
@@ -29,6 +46,7 @@ pub struct OrderInfo {
     pub status: OrderStatus,
 }
 
+/// A detailed order page with metadata and delivery secrets.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrderPage {
     pub id: String,

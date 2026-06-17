@@ -288,6 +288,90 @@ pub enum CategoryFilterType {
     Checkbox,
 }
 
+/// A node in the `FunPay` marketplace category tree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CategoryNode {
+    pub id: i64,
+    pub name: String,
+    pub subcategory_type: Option<CategorySubcategoryType>,
+    pub children: Vec<CategoryNode>,
+}
+
+/// Filter options for [`fetch_orders_with`](crate::SessionManager::fetch_orders_with).
+#[derive(Debug, Clone, Default)]
+pub struct FetchOrderOptions {
+    /// Only return orders with this status (e.g. `Paid`, `Closed`).
+    pub status: Option<OrderStatus>,
+    /// Minimum order amount (inclusive).
+    pub min_amount: Option<i32>,
+    /// Maximum order amount (inclusive).
+    pub max_amount: Option<i32>,
+    /// Only return orders in this subcategory.
+    pub subcategory: Option<String>,
+}
+
+impl FetchOrderOptions {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[must_use]
+    pub fn status(mut self, status: OrderStatus) -> Self {
+        self.status = Some(status);
+        self
+    }
+
+    #[must_use]
+    pub fn min_amount(mut self, amount: i32) -> Self {
+        self.min_amount = Some(amount);
+        self
+    }
+
+    #[must_use]
+    pub fn max_amount(mut self, amount: i32) -> Self {
+        self.max_amount = Some(amount);
+        self
+    }
+
+    pub fn subcategory(mut self, name: impl Into<String>) -> Self {
+        self.subcategory = Some(name.into());
+        self
+    }
+
+    /// Returns `true` if the given order matches all set filters.
+    #[must_use]
+    pub fn matches(&self, order: &OrderInfo) -> bool {
+        if let Some(status) = &self.status {
+            if &order.status != status {
+                return false;
+            }
+        }
+        if let Some(min) = self.min_amount {
+            if order.amount < min {
+                return false;
+            }
+        }
+        if let Some(max) = self.max_amount {
+            if order.amount > max {
+                return false;
+            }
+        }
+        if let Some(sub) = &self.subcategory {
+            if &order.subcategory_name != sub {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Filters a vector of orders, returning only matching entries.
+    #[must_use]
+    pub fn filter(&self, orders: Vec<OrderInfo>) -> Vec<OrderInfo> {
+        orders.into_iter().filter(|o| self.matches(o)).collect()
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BotState {
     pub seen_orders: Vec<String>,

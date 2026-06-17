@@ -1,6 +1,6 @@
 use crate::error::GoldenPayError;
 use crate::models::{
-    CategoryFilter, CategoryFilterOption, CategoryFilterType, CategorySubcategory,
+    CategoryFilter, CategoryFilterOption, CategoryFilterType, CategoryNode, CategorySubcategory,
     CategorySubcategoryType, ChatMessage, MarketOffer, Offer, OfferDetails, OfferEdit, OfferField,
     OfferFieldOption, OfferFieldType, OrderInfo, OrderPage, OrderStatus, PriceCalculation, Review,
     RunnerChatMessage, RunnerChatNode, RunnerObject, RunnerOrdersCounters, RunnerUnknownObject,
@@ -8,7 +8,7 @@ use crate::models::{
 };
 use crate::utils::extract_phpsessid;
 use regex::Regex;
-use scraper::{Html, Selector};
+use scraper::{ElementRef, Html, Selector};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -758,6 +758,68 @@ pub fn parse_category_filters(html: &str) -> Vec<CategoryFilter> {
     }
 
     filters
+}
+
+/// Parses the full category tree from the marketplace root page (`/lots/`).
+///
+/// Returns top-level categories, each containing nested children.
+pub fn parse_category_tree(html: &str) -> Vec<CategoryNode> {
+    let document = Html::parse_document(html);
+    let container = Selector::parse("div.category-list, ul.category-tree, ul.category-list").unwrap();
+    let link_selector = Selector::parse("a[href*='/lots/'], a[href*='/chips/']").unwrap();
+    let child_container = Selector::parse("div.category-children, ul.category-children, ul.nested, ul").unwrap();
+    let re = &SUBCAT_REGEX;
+
+    fn parse_children(
+        parent: &ElementRef,
+        link_selector: &Selector,
+        child_selector: &Selector,
+        re: &Regex,
+    ) -> Vec<CategoryNode> {
+        let mut nodes = Vec::new();
+        for link in parent.select(link_selector) {
+            let href = link.value().attr("href").unwrap_or_default();
+            let Some(caps) = re.captures(href) else {
+                continue;
+            };
+            let Some(id) = caps.get(2).and_then(|m| m.as_str().parse::<i64>().ok()) else {
+                continue;
+            };
+            let subcategory_type = match caps.get(1).map(|m| m.as_str()) {
+                Some("lots") => Some(CategorySubcategoryType::Lots),
+                Some("chips") => Some(CategorySubcategoryType::Chips),
+                _ => None,
+            };
+            let name = link.text().collect::<String>().trim().to_string();
+            if name.is_empty() {
+                continue;
+            }
+
+            let children = link
+                .parent()
+                .and_then(ElementRef::wrap)
+                .and_then(|elem| {
+                    elem.select(child_selector)
+                        .next()
+                        .map(|container| parse_children(&container, link_selector, child_selector, re))
+                })
+                .unwrap_or_default();
+
+            nodes.push(CategoryNode {
+                id,
+                name,
+                subcategory_type,
+                children,
+            });
+        }
+        nodes
+    }
+
+    document
+        .select(&container)
+        .next()
+        .map(|container| parse_children(&container, &link_selector, &child_container, re))
+        .unwrap_or_default()
 }
 
 fn extract_message_text(html: &str) -> Option<String> {

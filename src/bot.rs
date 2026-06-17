@@ -1,7 +1,7 @@
-use crate::client::GoldenPaySession;
 use crate::error::GoldenPayError;
 use crate::event::{BotOptions, EventStream, MessageFilter};
 use crate::models::{BotState, ChatMessage, OrderInfo};
+use crate::session::SessionManager;
 use crate::storage::{JsonStateStore, MemoryStateStore, StateStore};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
@@ -23,7 +23,7 @@ pub enum GoldenPayEvent {
 /// Call [`run`](GoldenPayBot::run) to start the event loop.
 /// Supports graceful shutdown via [`CancellationToken`](tokio_util::sync::CancellationToken).
 pub struct GoldenPayBot {
-    session: GoldenPaySession,
+    manager: SessionManager,
     store: Arc<dyn StateStore>,
     stream: EventStream,
     options: BotOptions,
@@ -32,16 +32,17 @@ pub struct GoldenPayBot {
 }
 
 impl GoldenPayBot {
+    /// Creates a bot from a [`SessionManager`] with auto-reconnect support.
     #[must_use]
-    pub fn new(session: GoldenPaySession) -> Self {
-        let store: Arc<dyn StateStore> = if let Some(path) = session.config().state_path.clone() {
+    pub fn new(manager: SessionManager) -> Self {
+        let store: Arc<dyn StateStore> = if let Some(path) = manager.config().state_path.clone() {
             Arc::new(JsonStateStore::new(path))
         } else {
             Arc::new(MemoryStateStore::new())
         };
 
         Self {
-            session,
+            manager,
             store,
             stream: EventStream::default(),
             options: BotOptions::default(),
@@ -50,9 +51,15 @@ impl GoldenPayBot {
         }
     }
 
-    pub fn with_store(session: GoldenPaySession, store: Arc<dyn StateStore>) -> Self {
+    /// Connects to `FunPay` and creates a bot with auto-reconnect support.
+    pub async fn connect(client: crate::client::GoldenPay) -> Result<Self, GoldenPayError> {
+        let manager = SessionManager::connect(client).await?;
+        Ok(Self::new(manager))
+    }
+
+    pub fn with_store(manager: SessionManager, store: Arc<dyn StateStore>) -> Self {
         Self {
-            session,
+            manager,
             store,
             stream: EventStream::default(),
             options: BotOptions::default(),
@@ -97,9 +104,21 @@ impl GoldenPayBot {
         });
     }
 
+    /// Returns a reference to the session manager.
     #[must_use]
-    pub fn session(&self) -> &GoldenPaySession {
-        &self.session
+    pub fn manager(&self) -> &SessionManager {
+        &self.manager
+    }
+
+    /// Returns a mutable reference to the session manager.
+    pub fn manager_mut(&mut self) -> &mut SessionManager {
+        &mut self.manager
+    }
+
+    /// Returns a reference to the underlying authenticated session.
+    #[must_use]
+    pub fn session(&self) -> &crate::client::GoldenPaySession {
+        self.manager.session()
     }
 
     pub async fn load_state(&mut self) -> Result<(), GoldenPayError> {
@@ -120,14 +139,14 @@ impl GoldenPayBot {
     }
 
     pub async fn bootstrap(&mut self) -> Result<(), GoldenPayError> {
-        let orders = self.session.fetch_orders().await?;
+        let orders = self.manager.fetch_orders().await?;
         tracing::info!(count = %orders.len(), "bootstrapping existing orders");
 
         for order in &orders {
             self.stream.seen_orders.insert(order.id.clone());
         }
 
-        let session = self.session.clone();
+        let session = self.manager.session().clone();
         let sem = self.concurrency_limit.clone();
         let mut set = JoinSet::new();
         for order in &orders {
@@ -154,13 +173,13 @@ impl GoldenPayBot {
     }
 
     pub async fn poll_once(&mut self) -> Result<Vec<GoldenPayEvent>, GoldenPayError> {
-        let orders = self.session.fetch_orders().await?;
+        let orders = self.manager.fetch_orders().await?;
         let mut events = Vec::new();
         let filter = MessageFilter {
             ignore_author_id: self
                 .options
                 .ignore_own_messages
-                .then_some(self.session.user().id),
+                .then_some(self.manager.user().id),
         };
 
         let mut emit_chats = Vec::new();
@@ -181,7 +200,7 @@ impl GoldenPayBot {
             }
         }
 
-        let session = self.session.clone();
+        let session = self.manager.session().clone();
         let sem = self.concurrency_limit.clone();
         let mut set = JoinSet::new();
         for chat_id in &emit_chats {
@@ -229,7 +248,7 @@ impl GoldenPayBot {
 
     pub async fn run<F, Fut>(&mut self, mut handler: F) -> Result<(), GoldenPayError>
     where
-        F: FnMut(GoldenPayEvent, &GoldenPaySession) -> Fut,
+        F: FnMut(GoldenPayEvent, &crate::client::GoldenPaySession) -> Fut,
         Fut: std::future::Future<Output = Result<(), GoldenPayError>>,
     {
         tracing::info!("bot started");
@@ -243,9 +262,9 @@ impl GoldenPayBot {
                 result = self.poll_once() => {
                     let events = result?;
                     for event in events {
-                        handler(event, &self.session).await?;
+                        handler(event, self.manager.session()).await?;
                     }
-                    tokio::time::sleep(self.session.poll_interval()).await;
+                    tokio::time::sleep(self.manager.poll_interval()).await;
                 }
             }
         }

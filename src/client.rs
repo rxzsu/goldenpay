@@ -1,14 +1,16 @@
 use crate::config::GoldenPayConfig;
 use crate::error::GoldenPayError;
 use crate::models::{
-    CategoryFilter, CategorySubcategory, ChatMessage, MarketOffer, Offer, OfferDetails, OfferEdit,
-    OfferSaveResponse, OrderInfo, OrderPage, PriceCalculation, RunnerResponse, UserInfo,
+    CategoryFilter, CategoryNode, CategorySubcategory, ChatMessage, MarketOffer, Offer,
+    OfferDetails, OfferEdit, OfferSaveResponse, OrderInfo, OrderPage, PriceCalculation,
+    RunnerResponse, UserInfo,
 };
 use crate::offer::OfferEditBuilder;
+use crate::models::FetchOrderOptions;
 use crate::parser::{
-    parse_category_filters, parse_category_subcategories, parse_chat_messages, parse_market_offers,
-    parse_my_offers, parse_offer_details, parse_order_page, parse_orders, parse_price_calculation,
-    parse_runner_objects, parse_user,
+    parse_category_filters, parse_category_subcategories, parse_category_tree, parse_chat_messages,
+    parse_market_offers, parse_my_offers, parse_offer_details, parse_order_page, parse_orders,
+    parse_price_calculation, parse_runner_objects, parse_user,
 };
 use crate::urls::Urls;
 use crate::utils::{random_tag, retry_sleep};
@@ -169,6 +171,14 @@ impl GoldenPaySession {
             .collect())
     }
 
+    /// Fetches orders filtered by the given options.
+    pub async fn fetch_orders_with(
+        &self,
+        options: &FetchOrderOptions,
+    ) -> Result<Vec<OrderInfo>, GoldenPayError> {
+        self.fetch_orders().await.map(|orders| options.filter(orders))
+    }
+
     /// Loads a single order page with parsed metadata and secrets.
     pub async fn fetch_order_page(&self, order_id: &str) -> Result<OrderPage, GoldenPayError> {
         let response = self.get_html(self.urls.order_page(order_id)).await?;
@@ -301,6 +311,12 @@ impl GoldenPaySession {
     ) -> Result<Vec<CategoryFilter>, GoldenPayError> {
         let response = self.get_html(self.urls.lots_page(node_id)).await?;
         Ok(parse_category_filters(&response.text().await?))
+    }
+
+    /// Fetches the full category tree from the marketplace root.
+    pub async fn fetch_category_tree(&self) -> Result<Vec<CategoryNode>, GoldenPayError> {
+        let response = self.get_html(self.urls.lots_home()).await?;
+        Ok(parse_category_tree(&response.text().await?))
     }
 
     /// Fetches category filters and subcategories using a single page load.

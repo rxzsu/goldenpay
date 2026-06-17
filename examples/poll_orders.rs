@@ -11,8 +11,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .build(),
     )?;
 
-    let session = client.connect().await?;
-    let mut bot = GoldenPayBot::new(session);
+    let mut bot = GoldenPayBot::connect(client).await?;
 
     bot.load_state().await?;
     bot.bootstrap().await?;

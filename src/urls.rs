@@ -47,6 +47,10 @@ impl Urls {
         format!("{}/lots/{node_id}/", self.base())
     }
 
+    pub fn lots_home(&self) -> String {
+        format!("{}/lots/", self.base())
+    }
+
     pub fn lots_calc(&self) -> String {
         format!("{}/lots/calc", self.base())
     }

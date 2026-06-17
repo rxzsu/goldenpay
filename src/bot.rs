@@ -4,6 +4,7 @@ use crate::event::{BotOptions, EventStream, MessageFilter};
 use crate::models::{BotState, ChatMessage, OrderInfo};
 use crate::storage::{JsonStateStore, MemoryStateStore, StateStore};
 use std::sync::Arc;
+use tokio::task::JoinSet;
 
 #[derive(Debug, Clone)]
 pub enum GoldenPayEvent {
@@ -70,15 +71,25 @@ impl GoldenPayBot {
 
     pub async fn bootstrap(&mut self) -> Result<(), GoldenPayError> {
         let orders = self.session.fetch_orders().await?;
-        for order in orders {
+
+        for order in &orders {
+            self.stream.seen_orders.insert(order.id.clone());
+        }
+
+        let session = self.session.clone();
+        let mut set = JoinSet::new();
+        for order in &orders {
             let chat_id = order.chat_id.clone();
-            self.stream.seen_orders.insert(order.id);
+            let session = session.clone();
+            set.spawn(async move {
+                let messages = session.fetch_chat_messages(&chat_id).await?;
+                Ok::<_, GoldenPayError>((chat_id, messages))
+            });
+        }
 
-            let mut last_message_id = 0;
-            for message in self.session.fetch_chat_messages(&chat_id).await? {
-                last_message_id = last_message_id.max(message.id);
-            }
-
+        while let Some(joined) = set.join_next().await {
+            let Ok(Ok((chat_id, messages))) = joined else { continue; };
+            let last_message_id = messages.iter().map(|m| m.id).max().unwrap_or_default();
             if last_message_id > 0 {
                 self.stream.seen_messages.insert(chat_id, last_message_id);
             }
@@ -97,21 +108,53 @@ impl GoldenPayBot {
                 .then_some(self.session.user().id),
         };
 
-        for order in orders {
+        // Phase 1: classify orders — identify new orders and determine which chats need messages
+        let mut emit_chats = Vec::new();
+        let mut mark_chats = Vec::new();
+        for order in &orders {
             let chat_id = order.chat_id.clone();
-            let is_new_order = self.stream.should_emit_order(&order);
+            let is_new_order = self.stream.seen_orders.insert(order.id.clone());
 
             if is_new_order {
                 events.push(GoldenPayEvent::NewOrder(order.clone()));
             }
 
-            let should_emit_messages = self.options.emit_messages_for_new_orders || !is_new_order;
-            let messages = self.session.fetch_chat_messages(&chat_id).await?;
+            let should_emit = self.options.emit_messages_for_new_orders || !is_new_order;
+            if should_emit {
+                emit_chats.push(chat_id);
+            } else {
+                mark_chats.push(chat_id);
+            }
+        }
 
-            if should_emit_messages {
-                for message in messages {
-                    if self.stream.should_emit_message(&message, &filter) {
-                        events.push(GoldenPayEvent::NewMessage(message));
+        // Phase 2: fetch messages concurrently for all needed chats
+        let session = self.session.clone();
+        let mut set = JoinSet::new();
+        for chat_id in &emit_chats {
+            let session = session.clone();
+            let cid = chat_id.clone();
+            set.spawn(async move {
+                let r = session.fetch_chat_messages(&cid).await;
+                (cid, r, true)
+            });
+        }
+        for chat_id in &mark_chats {
+            let session = session.clone();
+            let cid = chat_id.clone();
+            set.spawn(async move {
+                let r = session.fetch_chat_messages(&cid).await;
+                (cid, r, false)
+            });
+        }
+
+        // Phase 3: process results as they complete
+        while let Some(joined) = set.join_next().await {
+            let Ok((chat_id, result, should_emit)) = joined else { continue; };
+            let Ok(messages) = result else { continue; };
+            if should_emit {
+                for message in &messages {
+                    if self.stream.should_emit_message(message, &filter) {
+                        events.push(GoldenPayEvent::NewMessage(message.clone()));
                     }
                 }
             } else {

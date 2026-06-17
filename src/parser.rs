@@ -11,6 +11,17 @@ use regex::Regex;
 use scraper::{Html, Selector};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::LazyLock;
+
+static AMOUNT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(\d+)\s*(pcs|pieces|шт|ед)\.?").unwrap());
+static USER_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/users/(\d+)/").unwrap());
+static CHAT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/chat/(\d+)/").unwrap());
+static SUM_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([\d.,]+)\s*(\S+)").unwrap());
+static OFFER_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[?&]id=(\d+)").unwrap());
+static USER_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/users/(\d+)/?").unwrap());
+static REVIEWS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)").unwrap());
+static RATING_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"rating-(\d+(?:\.\d+)?)").unwrap());
+static SUBCAT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/(lots|chips)/(\d+)/?").unwrap());
 
 pub fn parse_user(home_html: &str, set_cookies: &[String]) -> Result<UserInfo, GoldenPayError> {
     let document = Html::parse_document(home_html);
@@ -64,8 +75,6 @@ pub fn parse_orders(html: &str, seller_id: i64) -> Result<Vec<OrderInfo>, Golden
     let desc_selector = Selector::parse("div.order-desc").unwrap();
     let buyer_selector = Selector::parse("div.media-user-name span").unwrap();
     let muted_selector = Selector::parse("div.text-muted").unwrap();
-    let amount_regex = Regex::new(r"(?i)(\d+)\s*(pcs|pieces|шт|ед)\.?").unwrap();
-
     let mut orders = Vec::new();
     for item in document.select(&item_selector) {
         let classes: Vec<_> = item.value().classes().collect();
@@ -112,7 +121,7 @@ pub fn parse_orders(html: &str, seller_id: i64) -> Result<Vec<OrderInfo>, Golden
             .map(|node| node.text().collect::<String>().trim().to_string())
             .unwrap_or_default();
 
-        let amount = amount_regex
+        let amount = AMOUNT_REGEX
             .captures(&description)
             .and_then(|caps| caps.get(1))
             .and_then(|m| m.as_str().parse::<i32>().ok())
@@ -206,9 +215,9 @@ pub fn parse_order_page(html: &str, order_id: &str) -> Result<OrderPage, GoldenP
     let review_selector = Selector::parse(".review-item").unwrap();
     let chat_selector = Selector::parse("a[href*='/chat/']").unwrap();
     let secret_selector = Selector::parse("span.secret-placeholder").unwrap();
-    let user_regex = Regex::new(r"/users/(\d+)/").unwrap();
-    let chat_regex = Regex::new(r"/chat/(\d+)/").unwrap();
-    let sum_regex = Regex::new(r"([\d.,]+)\s*(\S+)").unwrap();
+    let user_regex = &USER_REGEX;
+    let chat_regex = &CHAT_REGEX;
+    let sum_regex = &SUM_REGEX;
 
     let mut short_description = None;
     let mut full_description = None;
@@ -385,10 +394,10 @@ pub fn parse_market_offers(html: &str, node_id: i64) -> Vec<MarketOffer> {
     let reviews_selector = Selector::parse("div.media-user-reviews").unwrap();
     let rating_count_selector = Selector::parse("span.rating-mini-count").unwrap();
     let rating_stars_selector = Selector::parse("div.rating-stars").unwrap();
-    let offer_id_regex = Regex::new(r"[?&]id=(\d+)").unwrap();
-    let user_id_regex = Regex::new(r"/users/(\d+)/?").unwrap();
-    let reviews_regex = Regex::new(r"(\d+)").unwrap();
-    let rating_regex = Regex::new(r"rating-(\d+(?:\.\d+)?)").unwrap();
+    let offer_id_regex = &OFFER_ID_REGEX;
+    let user_id_regex = &USER_ID_REGEX;
+    let reviews_regex = &REVIEWS_REGEX;
+    let rating_regex = &RATING_REGEX;
     let mut offers = Vec::new();
 
     for item in document.select(&item_selector) {
@@ -614,7 +623,7 @@ pub fn parse_category_subcategories(html: &str) -> Vec<CategorySubcategory> {
     let item_selector = Selector::parse("a.counter-item").unwrap();
     let name_selector = Selector::parse("div.counter-param").unwrap();
     let count_selector = Selector::parse("div.counter-value").unwrap();
-    let re = Regex::new(r"/(lots|chips)/(\d+)/?").unwrap();
+    let re = &SUBCAT_REGEX;
 
     let Some(container) = document.select(&container_selector).next() else {
         return vec![];

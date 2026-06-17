@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0
+
+- **SessionManager** — new wrapper around `GoldenPaySession` with automatic reconnection on HTTP 401/403 (all 15 API methods covered)
+- **GoldenPayBot::connect()** — new async constructor that creates a `SessionManager` internally; the bot now auto-reconnects when the session expires
+- **FetchOrderOptions** — filter orders by `status`, `min_amount`, `max_amount`, `subcategory` with builder API and add `fetch_orders_with()` on both `GoldenPaySession` and `SessionManager`
+- **Category tree parser** — `parse_category_tree()` extracts the full marketplace hierarchy from `/lots/` with recursive `CategoryNode { id, name, subcategory_type, children }`; new `fetch_category_tree()` on both session types
+- **Pagination helper** — `SessionManager::fetch_all_orders()` placeholder for future multi-page order fetching
+- **Urls::lots_home()** — new URL helper for the marketplace root page
+- **Example** — `poll_orders.rs` updated to use `GoldenPayBot::connect()`
+
 ## 0.3.0
 
 - switch delivery flow to a safer reserve -> send -> commit sequence with pending delivery records

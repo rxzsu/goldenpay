@@ -2,13 +2,42 @@
 
 ## 0.4.0
 
-- **SessionManager** — new wrapper around `GoldenPaySession` with automatic reconnection on HTTP 401/403 (all 15 API methods covered)
-- **GoldenPayBot::connect()** — new async constructor that creates a `SessionManager` internally; the bot now auto-reconnects when the session expires
-- **FetchOrderOptions** — filter orders by `status`, `min_amount`, `max_amount`, `subcategory` with builder API and add `fetch_orders_with()` on both `GoldenPaySession` and `SessionManager`
+### Performance
+- move 10 regexes from per-call `Regex::new` to `std::sync::LazyLock` statics for significant CPU savings on hot paths
+- replace sequential chat-message fetching in `bootstrap()` / `poll_once()` with `JoinSet` + `Semaphore` (configurable concurrency, default 5)
+- update `scraper` from 0.26.0 to 0.27.0
+
+### Bot reliability
+- **SessionManager** — new wrapper around `GoldenPaySession` with automatic reconnection on HTTP 401/403; all 15 API methods retry once after reconnecting
+- **GoldenPayBot::connect()** — new async constructor that creates a `SessionManager` internally; the bot survives session expiry transparently
+- **Graceful shutdown** — add `CancellationToken` support (`.cancel()`, `.with_cancellation_token()`), `listen_for_shutdown()` spawns a Ctrl+C listener
+- **Throttling** — add `.with_concurrency_limit(n)` builder (default 5) to prevent API abuse
+- **Tracing** — add `tracing::info!`/`debug!`/`warn!` logs in `load_state`, `bootstrap`, `poll_once`, `run`, `connect`, `request_with_retry`, and session reconnect
+- **Session expired detection** — `connect()` returns `Unauthorized` when the golden key is invalid, fixing silent failures
+
+### Security
+- **Debug redact** — manual `fmt::Debug` on `GoldenPayConfig` masks `golden_key`, `UserInfo` masks `csrf_token` and `phpsessid`; credentials no longer leak into logs
+
+### API improvements
+- **FetchOrderOptions** — filter orders by `status`, `min_amount`, `max_amount`, `subcategory` with builder API; `fetch_orders_with()` on both `GoldenPaySession` and `SessionManager`
 - **Category tree parser** — `parse_category_tree()` extracts the full marketplace hierarchy from `/lots/` with recursive `CategoryNode { id, name, subcategory_type, children }`; new `fetch_category_tree()` on both session types
 - **Pagination helper** — `SessionManager::fetch_all_orders()` placeholder for future multi-page order fetching
+- **`#[non_exhaustive]`** — added to `GoldenPayEvent`, `OrderStatus`, `OfferFieldType` for forward compatibility
 - **Urls::lots_home()** — new URL helper for the marketplace root page
-- **Example** — `poll_orders.rs` updated to use `GoldenPayBot::connect()`
+- **Doc comments** — added crate-level docs and doc-comments on all public types/methods/variants
+
+### Clippy
+- fixed all 112 clippy pedantic warnings (auto-fixes + crate-level `#[allow]` for opinionated lints); zero warnings on `cargo clippy -- -W clippy::pedantic`
+
+### Example
+- `poll_orders.rs` updated to use `GoldenPayBot::connect()`
+
+### Dependencies
+- bump tokio features: `rt`, `macros`, `signal`
+- add `tokio-util` with `rt` feature
+- add `tracing` 0.1
+- bump `scraper` 0.26.0 → 0.27.0
+- bump `goldenpay` 0.3.0 → 0.4.0
 
 ## 0.3.0
 

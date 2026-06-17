@@ -1,7 +1,19 @@
-//! Production-oriented Rust SDK for FunPay automation.
+//! Production-oriented Rust SDK for `FunPay` automation.
 //!
 //! Provides session management, order polling, delivery automation,
-//! offer editing, and chat messaging for the FunPay marketplace.
+//! offer editing, and chat messaging for the `FunPay` marketplace.
+
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::too_many_lines,
+    clippy::return_self_not_must_use,
+    clippy::similar_names,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::items_after_statements
+)]
 
 pub mod automation;
 pub mod bot;

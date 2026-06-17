@@ -6,6 +6,7 @@ pub struct OfferEditBuilder {
 }
 
 impl OfferEditBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -30,16 +31,19 @@ impl OfferEditBuilder {
         self
     }
 
+    #[must_use]
     pub fn active(mut self, value: bool) -> Self {
         self.inner.active = Some(value);
         self
     }
 
+    #[must_use]
     pub fn deactivate_after_sale(mut self, value: bool) -> Self {
         self.inner.deactivate_after_sale = Some(value);
         self
     }
 
+    #[must_use]
     pub fn build(self) -> OfferEdit {
         self.inner
     }

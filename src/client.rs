@@ -16,7 +16,7 @@ use reqwest::header::{ACCEPT, CONTENT_TYPE, COOKIE, ORIGIN, REFERER, SET_COOKIE,
 use reqwest::{Client, Response};
 use serde_json::{Value, json};
 
-/// A reusable HTTP client for the FunPay API.
+/// A reusable HTTP client for the `FunPay` API.
 ///
 /// Created via [`GoldenPay::new`], it holds a connection pool and configuration.
 /// Call [`connect`](GoldenPay::connect) to obtain an authenticated session.
@@ -27,7 +27,7 @@ pub struct GoldenPay {
     urls: Urls,
 }
 
-/// An authenticated FunPay session tied to a seller account.
+/// An authenticated `FunPay` session tied to a seller account.
 ///
 /// Provides all API operations: fetching orders, sending messages,
 /// editing offers, calculating prices, and browsing the marketplace.
@@ -61,6 +61,7 @@ impl GoldenPay {
     }
 
     /// Returns the immutable runtime configuration.
+    #[must_use]
     pub fn config(&self) -> &GoldenPayConfig {
         &self.config
     }
@@ -105,16 +106,19 @@ impl GoldenPay {
 
 impl GoldenPaySession {
     /// Returns authenticated user metadata.
+    #[must_use]
     pub fn user(&self) -> &UserInfo {
         &self.user
     }
 
     /// Returns the polling interval between event checks.
+    #[must_use]
     pub fn poll_interval(&self) -> std::time::Duration {
         self.config.poll_interval
     }
 
     /// Returns the runtime configuration.
+    #[must_use]
     pub fn config(&self) -> &GoldenPayConfig {
         &self.config
     }

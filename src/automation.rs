@@ -78,6 +78,7 @@ impl Default for DeliveryMessageBuilder {
 }
 
 impl DeliveryMessageBuilder {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -92,16 +93,19 @@ impl DeliveryMessageBuilder {
         self
     }
 
+    #[must_use]
     pub fn item_format(mut self, value: DeliveryItemFormat) -> Self {
         self.item_format = value;
         self
     }
 
+    #[must_use]
     pub fn include_order_id(mut self, value: bool) -> Self {
         self.include_order_id = value;
         self
     }
 
+    #[must_use]
     pub fn include_product_key(mut self, value: bool) -> Self {
         self.include_product_key = value;
         self
@@ -117,16 +121,19 @@ impl DeliveryMessageBuilder {
         self
     }
 
+    #[must_use]
     pub fn no_template(mut self) -> Self {
         self.template = None;
         self
     }
 
+    #[must_use]
     pub fn no_footer(mut self) -> Self {
         self.footer = None;
         self
     }
 
+    #[must_use]
     pub fn format_items(&self, items: &[DeliveryItem]) -> String {
         match self.item_format {
             DeliveryItemFormat::PlainLines => items
@@ -151,6 +158,7 @@ impl DeliveryMessageBuilder {
         }
     }
 
+    #[must_use]
     pub fn build_message(&self, order: &OrderInfo, result: &DeliveryResult) -> String {
         let items_block = self.format_items(&result.delivered);
 
@@ -236,6 +244,7 @@ pub struct DeliveryService {
 }
 
 impl DeliveryService {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -320,10 +329,11 @@ impl DeliveryService {
             .or_default();
 
         let mut restored = reserved.result.delivered;
-        restored.extend(inventory.items.drain(..));
+        restored.append(&mut inventory.items);
         inventory.items = restored;
     }
 
+    #[must_use]
     pub fn remaining_items(&self, product_key: &str) -> Option<usize> {
         self.products.get(product_key).map(|inventory| inventory.items.len())
     }
@@ -426,6 +436,7 @@ pub struct MemoryDeliveryStore {
 }
 
 impl MemoryDeliveryStore {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -525,8 +536,7 @@ impl DeliveryStore for JsonDeliveryStore {
         let _guard = self.lock.lock().await;
         self.load_all()
             .await
-            .map(|records| records.contains_key(order_id))
-            .unwrap_or(false)
+            .is_ok_and(|records| records.contains_key(order_id))
     }
 
     async fn claim_pending(&self, result: &DeliveryResult) -> Result<(), GoldenPayError> {

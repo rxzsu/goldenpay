@@ -136,6 +136,7 @@ pub struct OfferSaveResponse {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum OrderStatus {
     Paid,
     Closed,
@@ -190,6 +191,7 @@ pub struct OfferEdit {
 }
 
 impl OfferEdit {
+    #[must_use]
     pub fn merge(self, other: OfferEdit) -> Self {
         Self {
             quantity: other.quantity.or(self.quantity),
@@ -239,6 +241,7 @@ pub struct OfferFieldOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum OfferFieldType {
     Text,
     Textarea,

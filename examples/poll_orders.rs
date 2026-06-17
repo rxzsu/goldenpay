@@ -25,6 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             GoldenPayEvent::NewMessage(message) => {
                 println!("new message in {}: {:?}", message.chat_id, message.text);
             }
+            _ => {}
         }
 
         Ok(())

@@ -52,6 +52,7 @@ impl GoldenPayConfig {
         }
     }
 
+    #[must_use]
     pub fn builder() -> GoldenPayConfigBuilder {
         GoldenPayConfigBuilder::default()
     }
@@ -91,6 +92,7 @@ impl Default for RetryPolicy {
 }
 
 impl RetryPolicy {
+    #[must_use]
     pub fn new(max_attempts: u32, base_delay: Duration) -> Self {
         Self {
             max_attempts,
@@ -115,11 +117,13 @@ impl GoldenPayConfigBuilder {
         self
     }
 
+    #[must_use]
     pub fn poll_interval(mut self, poll_interval: Duration) -> Self {
         self.poll_interval = Some(poll_interval);
         self
     }
 
+    #[must_use]
     pub fn retry_policy(mut self, retry: RetryPolicy) -> Self {
         self.retry = Some(retry);
         self
@@ -135,6 +139,7 @@ impl GoldenPayConfigBuilder {
         self
     }
 
+    #[must_use]
     pub fn build(self) -> GoldenPayConfig {
         let defaults = GoldenPayConfig::default();
         GoldenPayConfig {

@@ -19,6 +19,7 @@ pub struct MemoryStateStore {
 }
 
 impl MemoryStateStore {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

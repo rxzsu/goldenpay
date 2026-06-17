@@ -10,6 +10,7 @@ use tokio_util::sync::CancellationToken;
 
 /// An event emitted by [`GoldenPayBot`] during a poll cycle.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum GoldenPayEvent {
     /// A previously unseen order appeared on the trade page.
     NewOrder(OrderInfo),
@@ -31,6 +32,7 @@ pub struct GoldenPayBot {
 }
 
 impl GoldenPayBot {
+    #[must_use]
     pub fn new(session: GoldenPaySession) -> Self {
         let store: Arc<dyn StateStore> = if let Some(path) = session.config().state_path.clone() {
             Arc::new(JsonStateStore::new(path))
@@ -59,6 +61,7 @@ impl GoldenPayBot {
         }
     }
 
+    #[must_use]
     pub fn with_options(mut self, options: BotOptions) -> Self {
         self.options = options;
         self
@@ -66,12 +69,14 @@ impl GoldenPayBot {
 
     /// Associates a cancellation token for graceful shutdown.
     /// When cancelled, the bot's [`run`](GoldenPayBot::run) loop exits cleanly.
+    #[must_use]
     pub fn with_cancellation_token(mut self, token: CancellationToken) -> Self {
         self.cancel_token = token;
         self
     }
 
     /// Sets the maximum number of concurrent API requests (default: 5).
+    #[must_use]
     pub fn with_concurrency_limit(mut self, max_concurrent: usize) -> Self {
         self.concurrency_limit = Arc::new(Semaphore::new(max_concurrent));
         self
@@ -82,6 +87,17 @@ impl GoldenPayBot {
         self.cancel_token.cancel();
     }
 
+    /// Spawns a task that listens for Ctrl+C and triggers graceful shutdown.
+    pub fn listen_for_shutdown(&self) {
+        let token = self.cancel_token.clone();
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.unwrap();
+            tracing::info!("received Ctrl+C, shutting down");
+            token.cancel();
+        });
+    }
+
+    #[must_use]
     pub fn session(&self) -> &GoldenPaySession {
         &self.session
     }
@@ -220,7 +236,7 @@ impl GoldenPayBot {
         let token = self.cancel_token.clone();
         loop {
             tokio::select! {
-                _ = token.cancelled() => {
+                () = token.cancelled() => {
                     tracing::info!("bot received shutdown signal");
                     return Ok(());
                 }

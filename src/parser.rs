@@ -170,6 +170,7 @@ pub fn parse_runner_objects(response: &Value) -> Vec<RunnerObject> {
         .collect()
 }
 
+#[must_use]
 pub fn parse_price_calculation(response: Value, input_price: f64) -> PriceCalculation {
     let mut numeric_fields = HashMap::new();
     collect_numeric_fields(None, &response, &mut numeric_fields);
@@ -239,7 +240,7 @@ pub fn parse_order_page(html: &str, order_id: &str) -> Result<OrderPage, GoldenP
 
         match label.to_ascii_lowercase().as_str() {
             "short description" | "краткое описание" => {
-                short_description = Some(value)
+                short_description = Some(value);
             }
             "full description" | "полное описание" => full_description = Some(value),
             "category" | "категория" => subcategory_name = Some(value),
@@ -278,18 +279,16 @@ pub fn parse_order_page(html: &str, order_id: &str) -> Result<OrderPage, GoldenP
         .unwrap_or_default();
     let (sum, currency) = sum_regex
         .captures(&sum_text)
-        .map(|caps| {
+        .map_or((0.0, String::new()), |caps| {
             let sum = caps
                 .get(1)
-                .map(|m| m.as_str().replace(',', ".").parse::<f64>().unwrap_or(0.0))
-                .unwrap_or(0.0);
+                .map_or(0.0, |m| m.as_str().replace(',', ".").parse::<f64>().unwrap_or(0.0));
             let currency = caps
                 .get(2)
                 .map(|m| m.as_str().to_string())
                 .unwrap_or_default();
             (sum, currency)
-        })
-        .unwrap_or((0.0, String::new()));
+        });
 
     let chat_id = document
         .select(&chat_selector)
@@ -443,9 +442,7 @@ pub fn parse_market_offers(html: &str, node_id: i64) -> Vec<MarketOffer> {
             .next()
             .map(|node| {
                 node.select(&rating_count_selector)
-                    .next()
-                    .map(|n| n.text().collect::<String>())
-                    .unwrap_or_else(|| node.text().collect::<String>())
+                    .next().map_or_else(|| node.text().collect::<String>(), |n| n.text().collect::<String>())
             })
             .and_then(|text| {
                 reviews_regex
@@ -589,7 +586,7 @@ pub fn parse_offer_details(html: &str, offer_id: i64, node_id: i64) -> OfferDeta
                     let selected_here = opt.value().attr("selected").is_some();
                     let value = opt.value().attr("value").unwrap_or_default().to_string();
                     if selected_here {
-                        selected = value.clone();
+                        selected.clone_from(&value);
                     }
                     OfferFieldOption {
                         value,
@@ -694,9 +691,7 @@ pub fn parse_category_filters(html: &str) -> Vec<CategoryFilter> {
         if let Some(select) = field.select(&select_selector).next() {
             let name = select
                 .value()
-                .attr("name")
-                .map(|n| n.strip_prefix("f-").unwrap_or(n).to_string())
-                .unwrap_or_else(|| field_id.to_string());
+                .attr("name").map_or_else(|| field_id.to_string(), |n| n.strip_prefix("f-").unwrap_or(n).to_string());
             let options = select
                 .select(&option_selector)
                 .filter_map(|opt| {
@@ -739,9 +734,7 @@ pub fn parse_category_filters(html: &str) -> Vec<CategoryFilter> {
                 id: field_id.to_string(),
                 name: field
                     .select(&label_selector)
-                    .next()
-                    .map(|n| n.text().collect::<String>().trim().to_string())
-                    .unwrap_or_else(|| field_id.to_string()),
+                    .next().map_or_else(|| field_id.to_string(), |n| n.text().collect::<String>().trim().to_string()),
                 filter_type: CategoryFilterType::Range,
                 options: vec![],
             });
@@ -862,9 +855,7 @@ fn collect_numeric_fields(prefix: Option<&str>, value: &Value, out: &mut HashMap
         }
         Value::Object(map) => {
             for (key, nested) in map {
-                let next = prefix
-                    .map(|prefix| format!("{prefix}.{key}"))
-                    .unwrap_or_else(|| key.clone());
+                let next = prefix.map_or_else(|| key.clone(), |prefix| format!("{prefix}.{key}"));
                 collect_numeric_fields(Some(&next), nested, out);
             }
         }
@@ -926,8 +917,7 @@ fn extract_checkbox_value(doc: &Html, name: &str) -> bool {
         .unwrap_or_else(|_| Selector::parse("input").unwrap());
     doc.select(&selector)
         .next()
-        .map(|el| el.value().attr("checked").is_some())
-        .unwrap_or(false)
+        .is_some_and(|el| el.value().attr("checked").is_some())
 }
 
 fn extract_select_value(doc: &Html, name: &str) -> String {

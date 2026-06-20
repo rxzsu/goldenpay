@@ -308,6 +308,10 @@ pub struct FetchOrderOptions {
     pub max_amount: Option<i32>,
     /// Only return orders in this subcategory.
     pub subcategory: Option<String>,
+    /// Only return orders whose buyer username contains this string (case-insensitive).
+    pub buyer: Option<String>,
+    /// Only return orders whose description contains this string (case-insensitive).
+    pub description: Option<String>,
 }
 
 impl FetchOrderOptions {
@@ -334,8 +338,21 @@ impl FetchOrderOptions {
         self
     }
 
+    #[must_use]
     pub fn subcategory(mut self, name: impl Into<String>) -> Self {
         self.subcategory = Some(name.into());
+        self
+    }
+
+    /// Only return orders whose buyer username contains this string.
+    pub fn buyer(mut self, name: impl Into<String>) -> Self {
+        self.buyer = Some(name.into());
+        self
+    }
+
+    /// Only return orders whose description contains this string.
+    pub fn description(mut self, text: impl Into<String>) -> Self {
+        self.description = Some(text.into());
         self
     }
 
@@ -359,6 +376,16 @@ impl FetchOrderOptions {
         }
         if let Some(sub) = &self.subcategory {
             if &order.subcategory_name != sub {
+                return false;
+            }
+        }
+        if let Some(buyer) = &self.buyer {
+            if !order.buyer_username.to_ascii_lowercase().contains(&buyer.to_ascii_lowercase()) {
+                return false;
+            }
+        }
+        if let Some(desc) = &self.description {
+            if !order.description.to_ascii_lowercase().contains(&desc.to_ascii_lowercase()) {
                 return false;
             }
         }

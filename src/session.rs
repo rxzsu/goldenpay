@@ -8,6 +8,7 @@ use crate::models::{
 };
 use crate::offer::OfferEditBuilder;
 use std::time::Duration;
+use tokio::task::JoinSet;
 
 /// Manages an authenticated [`GoldenPaySession`] with automatic reconnection
 /// when the session expires (HTTP 401/403).
@@ -99,6 +100,71 @@ impl SessionManager {
         } else {
             result
         }
+    }
+
+    /// Sends chat messages to multiple dialogs concurrently.
+    ///
+    /// Returns individual results; if an auth error is detected, the session
+    /// is reconnected before returning.
+    pub async fn send_messages(
+        &mut self,
+        messages: impl IntoIterator<Item = (String, String)>,
+    ) -> Result<Vec<Result<RunnerResponse, GoldenPayError>>, GoldenPayError> {
+        let mut set = JoinSet::new();
+        let session = self.session.clone();
+        for (chat_id, text) in messages {
+            let session = session.clone();
+            set.spawn(async move { session.send_message(&chat_id, &text).await });
+        }
+
+        let mut results = Vec::with_capacity(set.len());
+        let mut needs_reconnect = false;
+        while let Some(joined) = set.join_next().await {
+            let result = joined.unwrap_or_else(|e| {
+                Err(GoldenPayError::parse("send_messages", e.to_string()))
+            });
+            if matches_err_unauthorized(&result) {
+                needs_reconnect = true;
+            }
+            results.push(result);
+        }
+        if needs_reconnect {
+            self.reconnect().await?;
+        }
+        Ok(results)
+    }
+
+    /// Fetches multiple order pages concurrently.
+    ///
+    /// Returns individual results; if an auth error is detected, the session
+    /// is reconnected before returning.
+    pub async fn fetch_orders_batch(
+        &mut self,
+        order_ids: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Result<Vec<Result<OrderPage, GoldenPayError>>, GoldenPayError> {
+        let mut set = JoinSet::new();
+        let session = self.session.clone();
+        for order_id in order_ids {
+            let oid: String = order_id.into();
+            let session = session.clone();
+            set.spawn(async move { session.fetch_order_page(&oid).await });
+        }
+
+        let mut results = Vec::with_capacity(set.len());
+        let mut needs_reconnect = false;
+        while let Some(joined) = set.join_next().await {
+            let result = joined.unwrap_or_else(|e| {
+                Err(GoldenPayError::parse("fetch_orders_batch", e.to_string()))
+            });
+            if matches_err_unauthorized(&result) {
+                needs_reconnect = true;
+            }
+            results.push(result);
+        }
+        if needs_reconnect {
+            self.reconnect().await?;
+        }
+        Ok(results)
     }
 
     /// Fetches current order shortcuts from the trade page.

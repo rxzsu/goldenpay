@@ -17,6 +17,7 @@ use crate::utils::{random_tag, retry_sleep};
 use reqwest::header::{ACCEPT, CONTENT_TYPE, COOKIE, ORIGIN, REFERER, SET_COOKIE, USER_AGENT};
 use reqwest::{Client, Response};
 use serde_json::{Value, json};
+use tokio::task::JoinSet;
 
 /// A reusable HTTP client for the `FunPay` API.
 ///
@@ -123,6 +124,47 @@ impl GoldenPaySession {
     #[must_use]
     pub fn config(&self) -> &GoldenPayConfig {
         &self.config
+    }
+
+    /// Sends chat messages to multiple dialogs concurrently.
+    ///
+    /// Returns a vector of results in the same order as the input.
+    pub async fn send_messages(
+        &self,
+        messages: impl IntoIterator<Item = (String, String)>,
+    ) -> Vec<Result<RunnerResponse, GoldenPayError>> {
+        let mut set = JoinSet::new();
+        for (chat_id, text) in messages {
+            let session = self.clone();
+            set.spawn(async move { session.send_message(&chat_id, &text).await });
+        }
+
+        let mut results = Vec::with_capacity(set.len());
+        while let Some(joined) = set.join_next().await {
+            results.push(joined.unwrap_or_else(|e| Err(GoldenPayError::parse("send_messages", e.to_string()))));
+        }
+        results
+    }
+
+    /// Fetches multiple order pages concurrently.
+    ///
+    /// Returns a vector of results in the same order as the input.
+    pub async fn fetch_orders_batch(
+        &self,
+        order_ids: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Vec<Result<OrderPage, GoldenPayError>> {
+        let mut set = JoinSet::new();
+        for order_id in order_ids {
+            let oid: String = order_id.into();
+            let session = self.clone();
+            set.spawn(async move { session.fetch_order_page(&oid).await });
+        }
+
+        let mut results = Vec::with_capacity(set.len());
+        while let Some(joined) = set.join_next().await {
+            results.push(joined.unwrap_or_else(|e| Err(GoldenPayError::parse("fetch_orders_batch", e.to_string()))));
+        }
+        results
     }
 
     /// Sends a chat message to a dialog.

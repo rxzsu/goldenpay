@@ -1,7 +1,6 @@
 use thiserror::Error;
 
 /// Errors returned by the goldenpay SDK.
-/// Errors returned by the goldenpay SDK.
 #[derive(Debug, Error)]
 pub enum GoldenPayError {
     /// The golden key was empty or missing.

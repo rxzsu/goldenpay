@@ -363,14 +363,6 @@ impl SessionManager {
             result
         }
     }
-
-    /// Fetches all orders, following pagination links if available.
-    ///
-    /// Currently fetches the first page of orders; pagination support
-    /// will be added in a future release.
-    pub async fn fetch_all_orders(&mut self) -> Result<Vec<OrderInfo>, GoldenPayError> {
-        self.fetch_orders().await
-    }
 }
 
 fn matches_err_unauthorized<T>(result: &Result<T, GoldenPayError>) -> bool {

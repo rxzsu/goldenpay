@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.5.0
+
+### Breaking changes
+- **remove `SessionManager::fetch_all_orders`** — the method was a misleading alias for `fetch_orders` (FunPay's trade page does not support traditional pagination). Call `fetch_orders` (and apply `FetchOrderOptions` filters) directly.
 
 ### Bug fixes
 - remove duplicate doc comment on `GoldenPayError`
@@ -10,6 +13,7 @@
 - `FetchOrderOptions` — new `buyer` and `description` text filters (case-insensitive contains match) with builder methods `.buyer()` / `.description()`
 - **Batch operations** — `GoldenPaySession::send_messages()` and `GoldenPaySession::fetch_orders_batch()` send messages and fetch order pages concurrently via `JoinSet`
 - `SessionManager::send_messages()` and `SessionManager::fetch_orders_batch()` — same batch APIs with auto-reconnect on auth error
+- **Example** — `examples/batch_send.rs` shows how to combine `FetchOrderOptions` filters with concurrent `send_messages` and `fetch_orders_batch`
 
 ### Refactoring
 - `GoldenPayBot::poll_once` now uses `EventStream::should_emit_order` instead of inlining `seen_orders.insert`

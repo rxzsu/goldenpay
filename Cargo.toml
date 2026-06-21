@@ -11,7 +11,7 @@ documentation = "https://docs.rs/goldenpay"
 readme = "README.md"
 keywords = ["funpay", "sdk", "automation", "bot"]
 categories = ["api-bindings", "web-programming::http-client"]
-include = ["src/**", "tests/**", "examples/**", "README.md", "LICENSE", "CHANGELOG.md"]
+exclude = ["/landing", "/data", "/target", "/.idea", "/.vscode", "*.log"]
 
 [dependencies]
 async-trait = "0.1.89"

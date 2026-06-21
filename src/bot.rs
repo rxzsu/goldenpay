@@ -186,7 +186,7 @@ impl GoldenPayBot {
         let mut mark_chats = Vec::new();
         for order in &orders {
             let chat_id = order.chat_id.clone();
-            let is_new_order = self.stream.seen_orders.insert(order.id.clone());
+            let is_new_order = self.stream.should_emit_order(order);
 
             if is_new_order {
                 events.push(GoldenPayEvent::NewOrder(order.clone()));

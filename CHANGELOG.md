@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+- remove duplicate doc comment on `GoldenPayError`
+- add missing `#[must_use]` to `FetchOrderOptions::subcategory`
+
+### Features
+- `FetchOrderOptions` — new `buyer` and `description` text filters (case-insensitive contains match) with builder methods `.buyer()` / `.description()`
+- **Batch operations** — `GoldenPaySession::send_messages()` and `GoldenPaySession::fetch_orders_batch()` send messages and fetch order pages concurrently via `JoinSet`
+- `SessionManager::send_messages()` and `SessionManager::fetch_orders_batch()` — same batch APIs with auto-reconnect on auth error
+
+### Refactoring
+- `GoldenPayBot::poll_once` now uses `EventStream::should_emit_order` instead of inlining `seen_orders.insert`
+
+### Tests
+- 8 new unit tests for `FetchOrderOptions` (filters, case-insensitivity, combined filters)
+- 4 new unit tests for `parse_user` (Unauthorized detection paths, `phpsessid` extraction)
+- 5 new unit tests for `GoldenPayConfig` / `RetryPolicy` (defaults, debug redaction, chaining)
+
 ## 0.4.0
 
 ### Performance

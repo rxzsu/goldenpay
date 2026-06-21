@@ -172,4 +172,48 @@ mod tests {
         assert_eq!(config.poll_interval, Duration::from_secs(5));
         assert_eq!(config.retry.max_attempts, 7);
     }
+
+    #[test]
+    fn default_config_has_sane_values() {
+        let config = GoldenPayConfig::default();
+        assert_eq!(config.base_url, "https://funpay.com");
+        assert!(config.user_agent.starts_with("goldenpay/"));
+        assert_eq!(config.poll_interval, Duration::from_secs(2));
+        assert!(config.proxy.is_none());
+        assert!(config.state_path.is_none());
+        assert_eq!(config.retry.max_attempts, 3);
+    }
+
+    #[test]
+    fn default_retry_policy_is_sane() {
+        let policy = RetryPolicy::default();
+        assert_eq!(policy.max_attempts, 3);
+        assert_eq!(policy.base_delay, Duration::from_millis(300));
+    }
+
+    #[test]
+    fn config_debug_masks_golden_key() {
+        let config = GoldenPayConfig::new("super-secret-key");
+        let debug = format!("{config:?}");
+        assert!(!debug.contains("super-secret-key"));
+        assert!(debug.contains("***"));
+    }
+
+    #[test]
+    fn new_uses_default_for_omitted_fields() {
+        let config = GoldenPayConfig::new("xyz");
+        assert_eq!(config.golden_key, "xyz");
+        assert_eq!(config.base_url, "https://funpay.com");
+        assert_eq!(config.poll_interval, Duration::from_secs(2));
+    }
+
+    #[test]
+    fn with_proxy_and_state_path_chaining() {
+        let config = GoldenPayConfig::new("k")
+            .with_proxy("http://proxy:8080")
+            .with_state_path("/tmp/state.json");
+
+        assert_eq!(config.proxy.as_deref(), Some("http://proxy:8080"));
+        assert_eq!(config.state_path.as_deref().unwrap().to_str(), Some("/tmp/state.json"));
+    }
 }

@@ -76,7 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## Automation example
 
-See [examples/process_paid_order.rs](/D:/Funpay/goldenpay/examples/process_paid_order.rs) for a
+See [examples/process_paid_order.rs](examples/process_paid_order.rs) for a
 high-level flow that:
 
 - finds a paid order

@@ -404,3 +404,92 @@ pub struct BotState {
     pub seen_orders: Vec<String>,
     pub seen_messages: HashMap<String, i64>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_order(buyer: &str, desc: &str, amount: i32) -> OrderInfo {
+        OrderInfo {
+            id: "ORDER1".to_string(),
+            buyer_username: buyer.to_string(),
+            buyer_id: 2,
+            chat_id: "users-1-2".to_string(),
+            description: desc.to_string(),
+            subcategory_name: "Steam Keys".to_string(),
+            amount,
+            status: OrderStatus::Paid,
+        }
+    }
+
+    #[test]
+    fn matches_combines_all_filters() {
+        let order = sample_order("Alice", "Steam key", 2);
+        let options = FetchOrderOptions::new()
+            .status(OrderStatus::Paid)
+            .min_amount(1)
+            .max_amount(5)
+            .subcategory("Steam Keys")
+            .buyer("ali")
+            .description("steam");
+
+        assert!(options.matches(&order));
+    }
+
+    #[test]
+    fn rejects_when_status_differs() {
+        let mut order = sample_order("Alice", "Steam key", 1);
+        order.status = OrderStatus::Closed;
+        let options = FetchOrderOptions::new().status(OrderStatus::Paid);
+        assert!(!options.matches(&order));
+    }
+
+    #[test]
+    fn rejects_when_amount_below_min() {
+        let order = sample_order("Alice", "x", 1);
+        let options = FetchOrderOptions::new().min_amount(2);
+        assert!(!options.matches(&order));
+    }
+
+    #[test]
+    fn rejects_when_amount_above_max() {
+        let order = sample_order("Alice", "x", 10);
+        let options = FetchOrderOptions::new().max_amount(5);
+        assert!(!options.matches(&order));
+    }
+
+    #[test]
+    fn buyer_filter_is_case_insensitive() {
+        let order = sample_order("AliceInWonderland", "x", 1);
+        assert!(FetchOrderOptions::new().buyer("alice").matches(&order));
+        assert!(FetchOrderOptions::new().buyer("WONDER").matches(&order));
+        assert!(!FetchOrderOptions::new().buyer("bob").matches(&order));
+    }
+
+    #[test]
+    fn description_filter_is_case_insensitive() {
+        let order = sample_order("Alice", "Steam Account EU", 1);
+        assert!(FetchOrderOptions::new().description("steam").matches(&order));
+        assert!(FetchOrderOptions::new().description("account").matches(&order));
+        assert!(!FetchOrderOptions::new().description("valorant").matches(&order));
+    }
+
+    #[test]
+    fn empty_filters_match_everything() {
+        let order = sample_order("Anyone", "anything", 999);
+        let options = FetchOrderOptions::default();
+        assert!(options.matches(&order));
+    }
+
+    #[test]
+    fn filter_returns_only_matching_orders() {
+        let orders = vec![
+            sample_order("Alice", "Steam key", 1),
+            sample_order("Bob", "Valorant points", 5),
+        ];
+        let options = FetchOrderOptions::new().buyer("bob");
+        let filtered = options.filter(orders);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].buyer_username, "Bob");
+    }
+}

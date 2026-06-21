@@ -1095,4 +1095,59 @@ mod tests {
         assert_eq!(price.commission, Some(4.5));
         assert_eq!(price.numeric_fields.get("meta.site_fee"), Some(&4.5));
     }
+
+    #[test]
+    fn parse_user_returns_unauthorized_when_username_missing() {
+        let html = r#"
+            <html>
+              <body data-app-data='{"userId":111,"csrf-token":"csrf"}'>
+              </body>
+            </html>
+        "#;
+        let result = parse_user(html, &[]);
+        assert!(matches!(result, Err(GoldenPayError::Unauthorized)));
+    }
+
+    #[test]
+    fn parse_user_returns_unauthorized_when_username_empty() {
+        let html = r#"
+            <html>
+              <body data-app-data='{"userId":111,"csrf-token":"csrf"}'>
+                <div class="user-link-name">   </div>
+              </body>
+            </html>
+        "#;
+        let result = parse_user(html, &[]);
+        assert!(matches!(result, Err(GoldenPayError::Unauthorized)));
+    }
+
+    #[test]
+    fn parse_user_returns_unauthorized_when_data_app_data_missing() {
+        let html = r#"
+            <html>
+              <body>
+                <div class="user-link-name">Seller</div>
+              </body>
+            </html>
+        "#;
+        let result = parse_user(html, &[]);
+        assert!(matches!(result, Err(GoldenPayError::Unauthorized)));
+    }
+
+    #[test]
+    fn parse_user_extracts_phpsessid_from_set_cookies() {
+        let html = r#"
+            <html>
+              <body data-app-data='{"userId":111,"csrf-token":"csrf"}'>
+                <div class="user-link-name">SellerOne</div>
+              </body>
+            </html>
+        "#;
+        let cookies = vec!["PHPSESSID=abc123; path=/".to_string()];
+        let user = parse_user(html, &cookies).unwrap();
+        assert_eq!(user.username, "SellerOne");
+        assert_eq!(user.id, 111);
+        assert_eq!(user.csrf_token, "csrf");
+        assert_eq!(user.phpsessid.as_deref(), Some("abc123"));
+    }
 }

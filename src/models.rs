@@ -1,3 +1,5 @@
+//! Data models for orders, offers, messages, categories, and bot state.
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -66,12 +68,14 @@ pub struct OrderPage {
     pub raw_html: String,
 }
 
+/// A buyer's review left on a completed order.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Review {
     pub stars: Option<i32>,
     pub text: Option<String>,
 }
 
+/// Price breakdown including seller payout, buyer cost, and commission.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceCalculation {
     pub input_price: f64,
@@ -82,6 +86,7 @@ pub struct PriceCalculation {
     pub raw: serde_json::Value,
 }
 
+/// Raw response from the FunPay runner endpoint.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RunnerResponse {
     pub success: bool,
@@ -90,6 +95,7 @@ pub struct RunnerResponse {
     pub raw: serde_json::Value,
 }
 
+/// A parsed object from the runner response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum RunnerObject {
@@ -98,6 +104,7 @@ pub enum RunnerObject {
     Unknown(RunnerUnknownObject),
 }
 
+/// A chat node from the runner, containing messages and HTML.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RunnerChatNode {
     pub id: Option<String>,
@@ -106,6 +113,7 @@ pub struct RunnerChatNode {
     pub html: Option<String>,
 }
 
+/// A single message within a runner chat node.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunnerChatMessage {
     pub id: i64,
@@ -113,6 +121,7 @@ pub struct RunnerChatMessage {
     pub html: Option<String>,
 }
 
+/// Order counters from the runner (unread counts).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RunnerOrdersCounters {
     pub tag: Option<String>,
@@ -120,6 +129,7 @@ pub struct RunnerOrdersCounters {
     pub seller: i64,
 }
 
+/// An unrecognized runner object, preserved as raw JSON.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RunnerUnknownObject {
     pub object_type: Option<String>,
@@ -128,6 +138,7 @@ pub struct RunnerUnknownObject {
     pub raw: serde_json::Value,
 }
 
+/// Response from the offer-save endpoint.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OfferSaveResponse {
     pub success: bool,
@@ -135,6 +146,7 @@ pub struct OfferSaveResponse {
     pub raw: serde_json::Value,
 }
 
+/// The status of an order on FunPay.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum OrderStatus {
@@ -143,6 +155,7 @@ pub enum OrderStatus {
     Refunded,
 }
 
+/// A seller's own offer on the trade page.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Offer {
     pub id: i64,
@@ -153,6 +166,7 @@ pub struct Offer {
     pub active: bool,
 }
 
+/// A public market offer visible to buyers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketOffer {
     pub id: i64,
@@ -168,6 +182,7 @@ pub struct MarketOffer {
     pub is_promo: bool,
 }
 
+/// A partial or full edit to apply to an offer.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct OfferEdit {
     pub quantity: Option<String>,
@@ -191,6 +206,7 @@ pub struct OfferEdit {
 }
 
 impl OfferEdit {
+    /// Merges another edit on top of this one (other fields take priority).
     #[must_use]
     pub fn merge(self, other: OfferEdit) -> Self {
         Self {
@@ -216,6 +232,7 @@ impl OfferEdit {
     }
 }
 
+/// Full offer details including current values and custom dynamic fields.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OfferDetails {
     pub offer_id: i64,
@@ -224,6 +241,7 @@ pub struct OfferDetails {
     pub custom_fields: Vec<OfferField>,
 }
 
+/// A dynamic custom field on an offer edit form.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OfferField {
     pub name: String,
@@ -233,6 +251,7 @@ pub struct OfferField {
     pub options: Vec<OfferFieldOption>,
 }
 
+/// An option within a select-type offer field.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OfferFieldOption {
     pub value: String,
@@ -240,6 +259,7 @@ pub struct OfferFieldOption {
     pub selected: bool,
 }
 
+/// The input type of a custom offer field.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum OfferFieldType {
@@ -251,6 +271,7 @@ pub enum OfferFieldType {
     Unknown(String),
 }
 
+/// A subcategory within a marketplace category.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategorySubcategory {
     pub id: i64,
@@ -260,12 +281,14 @@ pub struct CategorySubcategory {
     pub is_active: bool,
 }
 
+/// Whether a subcategory lists standard offers (Lots) or virtual chips.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CategorySubcategoryType {
     Lots,
     Chips,
 }
 
+/// A filter available on a category page.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategoryFilter {
     pub id: String,
@@ -274,12 +297,14 @@ pub struct CategoryFilter {
     pub options: Vec<CategoryFilterOption>,
 }
 
+/// A single option within a category filter.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CategoryFilterOption {
     pub value: String,
     pub label: String,
 }
 
+/// The UI type of a category filter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CategoryFilterType {
     Select,
@@ -399,6 +424,7 @@ impl FetchOrderOptions {
     }
 }
 
+/// Persisted state for the polling bot (seen order IDs and message counters).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BotState {
     pub seen_orders: Vec<String>,

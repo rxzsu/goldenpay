@@ -1,3 +1,5 @@
+//! [`SessionManager`] — a session wrapper with automatic reconnection.
+
 use crate::client::{GoldenPay, GoldenPaySession};
 use crate::config::GoldenPayConfig;
 use crate::error::GoldenPayError;

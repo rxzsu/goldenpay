@@ -1,3 +1,5 @@
+//! Error types for the goldenpay SDK.
+
 use thiserror::Error;
 
 /// Errors returned by the goldenpay SDK.
@@ -50,6 +52,7 @@ pub enum GoldenPayError {
 }
 
 impl GoldenPayError {
+    /// Creates a [`Parse`](GoldenPayError::Parse) error with a context label.
     pub fn parse(context: &'static str, message: impl Into<String>) -> Self {
         Self::Parse {
             context,
@@ -57,6 +60,7 @@ impl GoldenPayError {
         }
     }
 
+    /// Creates a [`State`](GoldenPayError::State) error with a descriptive message.
     pub fn state(message: impl Into<String>) -> Self {
         Self::State {
             message: message.into(),

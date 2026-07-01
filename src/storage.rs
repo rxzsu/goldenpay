@@ -1,3 +1,5 @@
+//! State persistence adapters for bot state (seen orders and messages).
+
 use crate::error::GoldenPayError;
 use crate::models::BotState;
 use async_trait::async_trait;
@@ -13,12 +15,14 @@ pub trait StateStore: Send + Sync {
     async fn save(&self, state: &BotState) -> Result<(), GoldenPayError>;
 }
 
+/// In-memory bot state store (no persistence across restarts).
 #[derive(Default)]
 pub struct MemoryStateStore {
     state: Arc<Mutex<BotState>>,
 }
 
 impl MemoryStateStore {
+    /// Creates an empty in-memory state store.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -37,12 +41,14 @@ impl StateStore for MemoryStateStore {
     }
 }
 
+/// JSON-file-backed bot state store with atomic writes.
 pub struct JsonStateStore {
     path: PathBuf,
     lock: Arc<Mutex<()>>,
 }
 
 impl JsonStateStore {
+    /// Creates a store that persists bot state to the given file path.
     pub fn new(path: impl Into<PathBuf>) -> Self {
         Self {
             path: path.into(),

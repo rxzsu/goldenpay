@@ -1,8 +1,19 @@
+//! Configuration types: [`GoldenPayConfig`], builder, and retry policy.
+
 use std::fmt;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// Immutable runtime configuration for the FunPay client.
+///
+/// Create via [`GoldenPayConfig::builder`]:
+/// ```ignore
+/// GoldenPayConfig::builder()
+///     .golden_key("your_key")
+///     .poll_interval(Duration::from_secs(3))
+///     .build()
+/// ```
 #[derive(Clone)]
 pub struct GoldenPayConfig {
     pub golden_key: String,
@@ -30,6 +41,9 @@ impl fmt::Debug for GoldenPayConfig {
     }
 }
 
+/// Retry configuration for failed HTTP requests.
+///
+/// Uses exponential backoff: `base_delay * 2^(attempt - 1)`.
 #[derive(Debug, Clone)]
 pub struct RetryPolicy {
     pub max_attempts: u32,
@@ -49,6 +63,7 @@ pub struct GoldenPayConfigBuilder {
 }
 
 impl GoldenPayConfig {
+    /// Creates a config with the given golden key and defaults for other fields.
     pub fn new(golden_key: impl Into<String>) -> Self {
         Self {
             golden_key: golden_key.into(),
@@ -56,16 +71,19 @@ impl GoldenPayConfig {
         }
     }
 
+    /// Returns a builder for constructing a [`GoldenPayConfig`].
     #[must_use]
     pub fn builder() -> GoldenPayConfigBuilder {
         GoldenPayConfigBuilder::default()
     }
 
+    /// Sets an HTTP proxy for all requests.
     pub fn with_proxy(mut self, proxy: impl Into<String>) -> Self {
         self.proxy = Some(proxy.into());
         self
     }
 
+    /// Sets the file path for persistent bot state (orders and message IDs).
     pub fn with_state_path(mut self, path: impl Into<PathBuf>) -> Self {
         self.state_path = Some(path.into());
         self
@@ -97,6 +115,7 @@ impl Default for RetryPolicy {
 }
 
 impl RetryPolicy {
+    /// Creates a retry policy with the given max attempts and base delay.
     #[must_use]
     pub fn new(max_attempts: u32, base_delay: Duration) -> Self {
         Self {
@@ -107,49 +126,58 @@ impl RetryPolicy {
 }
 
 impl GoldenPayConfigBuilder {
+    /// Sets the golden key used for authentication.
     pub fn golden_key(mut self, golden_key: impl Into<String>) -> Self {
         self.golden_key = Some(golden_key.into());
         self
     }
 
+    /// Overrides the base URL (default: `https://funpay.com`).
     pub fn base_url(mut self, base_url: impl Into<String>) -> Self {
         self.base_url = Some(base_url.into());
         self
     }
 
+    /// Overrides the User-Agent header (default: `goldenpay/{version}`).
     pub fn user_agent(mut self, user_agent: impl Into<String>) -> Self {
         self.user_agent = Some(user_agent.into());
         self
     }
 
+    /// Sets the delay between bot poll cycles.
     #[must_use]
     pub fn poll_interval(mut self, poll_interval: Duration) -> Self {
         self.poll_interval = Some(poll_interval);
         self
     }
 
+    /// Sets the retry policy for failed HTTP requests.
     #[must_use]
     pub fn retry_policy(mut self, retry: RetryPolicy) -> Self {
         self.retry = Some(retry);
         self
     }
 
+    /// Sets an HTTP proxy for all outgoing requests.
     pub fn proxy(mut self, proxy: impl Into<String>) -> Self {
         self.proxy = Some(proxy.into());
         self
     }
 
+    /// Sets the file path for persistent bot state.
     pub fn state_path(mut self, path: impl Into<PathBuf>) -> Self {
         self.state_path = Some(path.into());
         self
     }
 
+    /// Limits the number of concurrent API requests (default: no limit).
     #[must_use]
     pub fn max_concurrent_requests(mut self, max: NonZeroUsize) -> Self {
         self.max_concurrent_requests = Some(max);
         self
     }
 
+    /// Consumes the builder and produces a [`GoldenPayConfig`].
     #[must_use]
     pub fn build(self) -> GoldenPayConfig {
         let defaults = GoldenPayConfig::default();

@@ -1,3 +1,5 @@
+//! HTTP client, authenticated session, and API request methods.
+
 use crate::config::GoldenPayConfig;
 use crate::error::GoldenPayError;
 use crate::models::{

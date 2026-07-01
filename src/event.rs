@@ -1,3 +1,5 @@
+//! Event stream for deduplicated order and message emission.
+
 use crate::models::{ChatMessage, OrderInfo};
 use std::collections::{HashMap, HashSet};
 
@@ -19,11 +21,13 @@ impl Default for BotOptions {
     }
 }
 
+/// Filter for suppressing messages by author.
 #[derive(Debug, Clone, Default)]
 pub struct MessageFilter {
     pub ignore_author_id: Option<i64>,
 }
 
+/// Tracks already-seen orders and messages to avoid duplicate events.
 #[derive(Debug, Clone, Default)]
 pub struct EventStream {
     pub seen_orders: HashSet<String>,
@@ -31,10 +35,12 @@ pub struct EventStream {
 }
 
 impl EventStream {
+    /// Returns `true` if this order is new (inserts it into the seen set).
     pub fn should_emit_order(&mut self, order: &OrderInfo) -> bool {
         self.seen_orders.insert(order.id.clone())
     }
 
+    /// Returns `true` if this message is new and passes the given filter.
     pub fn should_emit_message(&mut self, message: &ChatMessage, filter: &MessageFilter) -> bool {
         if filter.ignore_author_id == Some(message.author_id) {
             return false;

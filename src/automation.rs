@@ -1,3 +1,5 @@
+//! Delivery automation: inventory management, order matching, and message building.
+
 use crate::client::GoldenPaySession;
 use crate::error::GoldenPayError;
 use crate::models::{OrderInfo, OrderStatus, RunnerResponse};
@@ -10,29 +12,37 @@ use thiserror::Error;
 use tokio::fs;
 use tokio::sync::Mutex;
 
+/// A single deliverable item (e.g., a game key or account credential).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeliveryItem {
     pub value: String,
 }
 
+/// Controls how items are rendered in the delivery message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeliveryItemFormat {
+    /// One item per line, no numbering.
     PlainLines,
+    /// Numbered list: `1. item`, `2. item`, etc.
     Numbered,
+    /// Wrapped in a markdown code block.
     CodeBlock,
 }
 
+/// An inventory of [`DeliveryItem`]s for a given product.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ProductInventory {
     pub items: Vec<DeliveryItem>,
 }
 
+/// The result of matching an order against available inventory.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DeliveryMatch {
     pub product_key: String,
     pub items: Vec<DeliveryItem>,
 }
 
+/// A completed delivery: which items were sent for which order.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeliveryResult {
     pub order_id: String,
@@ -40,11 +50,13 @@ pub struct DeliveryResult {
     pub delivered: Vec<DeliveryItem>,
 }
 
+/// A reserved (but not yet committed) delivery.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReservedDelivery {
     pub result: DeliveryResult,
 }
 
+/// The full outcome of `DeliveryService::process_paid_order`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessPaidOrderResult {
     pub delivery: DeliveryResult,
@@ -78,61 +90,72 @@ impl Default for DeliveryMessageBuilder {
 }
 
 impl DeliveryMessageBuilder {
+    /// Creates a builder with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Sets the greeting line (e.g. "Thanks for your purchase!").
     pub fn greeting(mut self, value: impl Into<String>) -> Self {
         self.greeting = value.into();
         self
     }
 
+    /// Sets the intro line before the item list.
     pub fn intro(mut self, value: impl Into<String>) -> Self {
         self.intro = value.into();
         self
     }
 
+    /// Sets how items are formatted (`PlainLines`, `Numbered`, or `CodeBlock`).
     #[must_use]
     pub fn item_format(mut self, value: DeliveryItemFormat) -> Self {
         self.item_format = value;
         self
     }
 
+    /// Whether to include the order ID in the message.
     #[must_use]
     pub fn include_order_id(mut self, value: bool) -> Self {
         self.include_order_id = value;
         self
     }
 
+    /// Whether to include the product key (subcategory name) in the message.
     #[must_use]
     pub fn include_product_key(mut self, value: bool) -> Self {
         self.include_product_key = value;
         self
     }
 
+    /// Sets a closing footer line.
     pub fn footer(mut self, value: impl Into<String>) -> Self {
         self.footer = Some(value.into());
         self
     }
 
+    /// Uses a custom template with `{buyer}`, `{order_id}`, `{product_key}`, `{items}` placeholders.
     pub fn template(mut self, value: impl Into<String>) -> Self {
         self.template = Some(value.into());
         self
     }
 
+    /// Removes the custom template, reverting to the default format.
     #[must_use]
     pub fn no_template(mut self) -> Self {
         self.template = None;
         self
     }
 
+    /// Removes the footer from the message.
     #[must_use]
     pub fn no_footer(mut self) -> Self {
         self.footer = None;
         self
     }
 
+    /// Formats delivery items according to the configured [`DeliveryItemFormat`].
     #[must_use]
     pub fn format_items(&self, items: &[DeliveryItem]) -> String {
         match self.item_format {
@@ -192,26 +215,36 @@ impl DeliveryMessageBuilder {
     }
 }
 
+/// Errors that can occur during delivery processing.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum DeliveryError {
+    /// No product matched the order's subcategory.
     #[error("product not found")]
     ProductNotFound,
+    /// The inventory has fewer items than the order requires.
     #[error("not enough items available: requested {requested}, available {available}")]
     NotEnoughItems { requested: usize, available: usize },
+    /// This order was already delivered (tracked by [`DeliveryStore`]).
     #[error("order was already delivered")]
     AlreadyDelivered,
+    /// The order status is not [`OrderStatus::Paid`].
     #[error("order is not paid: status={status:?}")]
     OrderNotPaid { status: OrderStatus },
+    /// The runner API rejected the delivery message.
     #[error("delivery message was rejected: {message}")]
     MessageSendFailed { message: String },
 }
 
+/// Determines whether a product matches an order.
 pub trait ProductMatcher: Send + Sync {
+    /// Returns `true` if `product_key` matches the given `order`.
     fn matches(&self, product_key: &str, order: &OrderInfo) -> bool;
 }
 
+/// Abstraction for sending delivery messages (testable via mock).
 #[async_trait]
 pub trait DeliveryMessenger: Send + Sync {
+    /// Sends a delivery message to the given chat.
     async fn send_delivery_message(
         &self,
         chat_id: &str,
@@ -230,6 +263,7 @@ impl DeliveryMessenger for GoldenPaySession {
     }
 }
 
+/// Matches orders whose subcategory name exactly equals the product key.
 pub struct ExactSubcategoryMatcher;
 
 impl ProductMatcher for ExactSubcategoryMatcher {
@@ -244,11 +278,13 @@ pub struct DeliveryService {
 }
 
 impl DeliveryService {
+    /// Creates an empty delivery service with no products.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Registers a product with its available inventory.
     pub fn add_product(
         &mut self,
         product_key: impl Into<String>,
@@ -262,6 +298,7 @@ impl DeliveryService {
         );
     }
 
+    /// Finds the matching product for an order and reserves items (without removing them).
     pub fn match_order<M: ProductMatcher>(
         &self,
         matcher: &M,
@@ -290,6 +327,7 @@ impl DeliveryService {
         })
     }
 
+    /// Removes matched items from inventory and returns them as a delivery.
     pub fn deliver<M: ProductMatcher>(
         &mut self,
         matcher: &M,
@@ -312,6 +350,7 @@ impl DeliveryService {
         })
     }
 
+    /// Reserves items for an order (same as `deliver`, but returns a [`ReservedDelivery`]).
     pub fn reserve<M: ProductMatcher>(
         &mut self,
         matcher: &M,
@@ -322,6 +361,7 @@ impl DeliveryService {
         })
     }
 
+    /// Returns reserved items back to the inventory (e.g., after a failed send).
     pub fn release_reserved(&mut self, reserved: ReservedDelivery) {
         let inventory = self
             .products
@@ -333,11 +373,13 @@ impl DeliveryService {
         inventory.items = restored;
     }
 
+    /// Returns the number of items still available for a product.
     #[must_use]
     pub fn remaining_items(&self, product_key: &str) -> Option<usize> {
         self.products.get(product_key).map(|inventory| inventory.items.len())
     }
 
+    /// Delivers an order with deduplication via the given [`DeliveryStore`].
     pub async fn deliver_order<M: ProductMatcher, S: DeliveryStore>(
         &mut self,
         matcher: &M,
@@ -407,6 +449,7 @@ impl DeliveryService {
     }
 }
 
+/// A persisted record of a delivery with its current status.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeliveredOrderRecord {
     pub order_id: String,
@@ -415,27 +458,37 @@ pub struct DeliveredOrderRecord {
     pub status: DeliveryRecordStatus,
 }
 
+/// Whether a delivery record is pending confirmation or fully committed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DeliveryRecordStatus {
+    /// Items were reserved but not yet sent.
     Pending,
+    /// Items were sent and confirmed.
     Delivered,
 }
 
+/// Persistence for tracking delivered orders and preventing duplicates.
 #[async_trait]
 pub trait DeliveryStore: Send + Sync {
+    /// Returns `true` if the order ID has been recorded.
     async fn contains_order(&self, order_id: &str) -> bool;
+    /// Marks an order as pending delivery (fails if already recorded).
     async fn claim_pending(&self, result: &DeliveryResult) -> Result<(), GoldenPayError>;
+    /// Marks a pending order as fully delivered.
     async fn commit_delivered(&self, result: &DeliveryResult) -> Result<(), GoldenPayError>;
+    /// Removes a pending order record (e.g., after a failed send).
     async fn release_pending(&self, order_id: &str) -> Result<(), GoldenPayError>;
 }
 
+/// In-memory delivery store (no persistence across restarts).
 #[derive(Default)]
 pub struct MemoryDeliveryStore {
     inner: Arc<Mutex<HashMap<String, DeliveredOrderRecord>>>,
 }
 
 impl MemoryDeliveryStore {
+    /// Creates an empty in-memory delivery store.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -485,12 +538,14 @@ impl DeliveryStore for MemoryDeliveryStore {
     }
 }
 
+/// JSON-file-backed delivery store with atomic writes.
 pub struct JsonDeliveryStore {
     path: PathBuf,
     lock: Arc<Mutex<()>>,
 }
 
 impl JsonDeliveryStore {
+    /// Creates a store that persists deliveries to the given file path.
     pub fn new(path: impl Into<PathBuf>) -> Self {
         Self {
             path: path.into(),

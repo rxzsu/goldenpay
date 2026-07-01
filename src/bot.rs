@@ -1,3 +1,5 @@
+//! Polling bot that monitors orders and messages with state persistence.
+
 use crate::error::GoldenPayError;
 use crate::event::{BotOptions, EventStream, MessageFilter};
 use crate::models::{BotState, ChatMessage, OrderInfo};
@@ -21,7 +23,7 @@ pub enum GoldenPayEvent {
 /// A polling bot that monitors new orders and messages.
 ///
 /// Call [`run`](GoldenPayBot::run) to start the event loop.
-/// Supports graceful shutdown via [`CancellationToken`](tokio_util::sync::CancellationToken).
+/// Supports graceful shutdown via [`CancellationToken`].
 pub struct GoldenPayBot {
     manager: SessionManager,
     store: Arc<dyn StateStore>,
@@ -57,6 +59,7 @@ impl GoldenPayBot {
         Ok(Self::new(manager))
     }
 
+    /// Creates a bot from a session manager with a custom state store.
     pub fn with_store(manager: SessionManager, store: Arc<dyn StateStore>) -> Self {
         Self {
             manager,
@@ -68,6 +71,7 @@ impl GoldenPayBot {
         }
     }
 
+    /// Applies bot options (message filtering, etc.).
     #[must_use]
     pub fn with_options(mut self, options: BotOptions) -> Self {
         self.options = options;
@@ -121,6 +125,7 @@ impl GoldenPayBot {
         self.manager.session()
     }
 
+    /// Loads previously persisted state (seen orders and messages) from the store.
     pub async fn load_state(&mut self) -> Result<(), GoldenPayError> {
         let state = self.store.load().await?;
         self.stream.seen_orders = state.seen_orders.into_iter().collect();
@@ -129,6 +134,7 @@ impl GoldenPayBot {
         Ok(())
     }
 
+    /// Persists current state (seen orders and messages) to the store.
     pub async fn save_state(&self) -> Result<(), GoldenPayError> {
         self.store
             .save(&BotState {
@@ -138,6 +144,7 @@ impl GoldenPayBot {
             .await
     }
 
+    /// Pre-populates seen orders and messages so that past events are not re-emitted.
     pub async fn bootstrap(&mut self) -> Result<(), GoldenPayError> {
         let orders = self.manager.fetch_orders().await?;
         tracing::info!(count = %orders.len(), "bootstrapping existing orders");
@@ -172,6 +179,7 @@ impl GoldenPayBot {
         self.save_state().await
     }
 
+    /// Runs a single poll cycle: fetches orders, checks for new messages, returns events.
     pub async fn poll_once(&mut self) -> Result<Vec<GoldenPayEvent>, GoldenPayError> {
         let orders = self.manager.fetch_orders().await?;
         let mut events = Vec::new();

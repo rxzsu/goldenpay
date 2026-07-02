@@ -24,8 +24,10 @@ pub mod error;
 pub mod event;
 pub mod models;
 pub mod offer;
+pub mod security;
 pub mod session;
 pub mod storage;
+pub mod webhook;
 
 mod parser;
 mod urls;
@@ -51,7 +53,9 @@ pub use models::{
     RunnerObject, RunnerOrdersCounters, RunnerResponse, RunnerUnknownObject, UserInfo,
 };
 pub use offer::OfferEditBuilder;
+pub use security::{validate_golden_key, SecureString};
 pub use storage::{JsonStateStore, MemoryStateStore, StateStore};
+pub use webhook::{WebhookConfig, WebhookEvent, WebhookHandler, WebhookPayload, WebhookServer};
 
 #[doc(hidden)]
 pub use parser::{parse_price_calculation, parse_runner_objects};

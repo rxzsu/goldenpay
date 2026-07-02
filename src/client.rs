@@ -74,6 +74,13 @@ impl GoldenPay {
         &self.config
     }
 
+    /// Updates the golden key used for authentication.
+    ///
+    /// The new key is used on the next [`connect`](GoldenPay::connect) call.
+    pub fn set_golden_key(&mut self, key: impl Into<String>) {
+        self.config.golden_key = key.into();
+    }
+
     /// Establishes an authenticated session and fetches seller metadata.
     pub async fn connect(&self) -> Result<GoldenPaySession, GoldenPayError> {
         tracing::info!("connecting to FunPay");
@@ -318,6 +325,16 @@ impl GoldenPaySession {
         builder: OfferEditBuilder,
     ) -> Result<OfferSaveResponse, GoldenPayError> {
         self.edit_offer(node_id, offer_id, builder.build()).await
+    }
+
+    /// Performs a lightweight health check against the home page.
+    ///
+    /// Returns `true` if the server responds with a success status.
+    pub async fn check_connection(&self) -> bool {
+        self.get_html(self.urls.home())
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
     }
 
     /// Calculates price information for a node.

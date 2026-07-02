@@ -84,6 +84,23 @@ impl SessionManager {
         &mut self.session
     }
 
+    /// Checks whether the current session is still valid.
+    ///
+    /// Performs a lightweight HTTP request to the home page.
+    /// Returns `false` if the server is unreachable or returns an error.
+    pub async fn check_connection(&self) -> bool {
+        self.session.check_connection().await
+    }
+
+    /// Rotates the golden key and reconnects with the new credentials.
+    ///
+    /// On success the session is re-established with the new key.
+    /// On failure the old session is preserved.
+    pub async fn rotate_key(&mut self, new_key: impl Into<String>) -> Result<(), GoldenPayError> {
+        self.client.set_golden_key(new_key);
+        self.reconnect().await
+    }
+
     /// Returns authenticated user metadata.
     #[must_use]
     pub fn user(&self) -> &UserInfo {

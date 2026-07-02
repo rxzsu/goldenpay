@@ -86,6 +86,13 @@ impl GoldenPayBot {
         self
     }
 
+    /// Sets a welcome message to be automatically sent to the chat when a new order is received.
+    #[must_use]
+    pub fn with_welcome_message(mut self, message: impl Into<String>) -> Self {
+        self.options.auto_welcome_message = Some(message.into());
+        self
+    }
+
     /// Associates a cancellation token for graceful shutdown.
     /// When cancelled, the bot's [`run`](GoldenPayBot::run) loop exits cleanly.
     #[must_use]
@@ -281,6 +288,14 @@ impl GoldenPayBot {
                 result = self.poll_once() => {
                     let events = result?;
                     for event in events {
+                        if let GoldenPayEvent::NewOrder(ref order) = event {
+                            if let Some(ref welcome_msg) = self.options.auto_welcome_message {
+                                tracing::info!(order_id = %order.id, "sending auto-welcome message");
+                                if let Err(e) = self.manager.send_message(&order.chat_id, welcome_msg).await {
+                                    tracing::error!(order_id = %order.id, error = %e, "failed to send auto-welcome message");
+                                }
+                            }
+                        }
                         handler(event, self.manager.session()).await?;
                     }
 

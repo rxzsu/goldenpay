@@ -6,7 +6,7 @@ use crate::error::GoldenPayError;
 use crate::models::{
     CategoryFilter, CategoryNode, CategorySubcategory, ChatMessage, FetchOrderOptions, MarketOffer,
     Offer, OfferDetails, OfferEdit, OfferSaveResponse, OrderInfo, OrderPage, PriceCalculation,
-    RunnerResponse, UserInfo, ProfileReview, RaiseOffersResponse,
+    RunnerResponse, UserInfo, ProfileReview, RaiseOffersResponse, WithdrawRequest,
 };
 use crate::offer::OfferEditBuilder;
 use std::time::Duration;
@@ -344,6 +344,14 @@ impl SessionManager {
         filename: &str,
     ) -> Result<serde_json::Value, GoldenPayError> {
         reconnect_on_auth!(self, self.session.upload_chat_file(chat_id, file_bytes, filename))
+    }
+
+    /// Initiates a balance withdrawal request.
+    pub async fn withdraw(
+        &mut self,
+        request: &WithdrawRequest,
+    ) -> Result<RunnerResponse, GoldenPayError> {
+        reconnect_on_auth!(self, self.session.withdraw(request))
     }
 }
 

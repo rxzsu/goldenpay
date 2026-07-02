@@ -92,6 +92,16 @@ pub struct RaiseOffersResponse {
     pub message: Option<String>,
 }
 
+/// Request parameters for initiating a withdrawal/payout.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WithdrawRequest {
+    pub currency: String,
+    pub ext_currency: String,
+    pub wallet: String,
+    pub amount: f64,
+}
+
+
 
 /// Price breakdown including seller payout, buyer cost, and commission.
 #[derive(Debug, Clone, Serialize, Deserialize)]

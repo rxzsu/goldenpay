@@ -14,6 +14,8 @@ pub struct BotOptions {
     pub auto_raise_nodes: Option<Vec<i64>>,
     /// Interval for auto-raising offers (defaults to 2 hours if None and nodes are set).
     pub auto_raise_interval: Option<std::time::Duration>,
+    /// Welcome message to automatically send when a new order is received.
+    pub auto_welcome_message: Option<String>,
 }
 
 impl Default for BotOptions {
@@ -23,6 +25,7 @@ impl Default for BotOptions {
             emit_messages_for_new_orders: true,
             auto_raise_nodes: None,
             auto_raise_interval: None,
+            auto_welcome_message: None,
         }
     }
 }

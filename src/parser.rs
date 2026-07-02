@@ -1061,6 +1061,25 @@ mod tests {
     }
 
     #[test]
+    fn parses_profile_reviews_html() {
+        let html = r#"
+            <div class="review-item">
+                <div class="review-author"><a href="/users/12345/">BuyerX</a></div>
+                <div class="rating-mini"><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i></div>
+                <div class="review-text">Excellent seller! Very fast delivery.</div>
+                <a href="/orders/O999999/">Order Details</a>
+            </div>
+        "#;
+        let reviews = parse_profile_reviews(html);
+        assert_eq!(reviews.len(), 1);
+        assert_eq!(reviews[0].buyer_username, "BuyerX");
+        assert_eq!(reviews[0].buyer_id, 12345);
+        assert_eq!(reviews[0].stars, 5);
+        assert_eq!(reviews[0].text.as_deref(), Some("Excellent seller! Very fast delivery."));
+        assert_eq!(reviews[0].order_id.as_deref(), Some("O999999"));
+    }
+
+    #[test]
     fn parses_offer_details_fixture() {
         let html = fixture("offer_edit.html");
         let details = parse_offer_details(&html, 99, 77);

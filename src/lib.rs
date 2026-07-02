@@ -50,8 +50,8 @@ pub use models::{
     CategorySubcategoryType, ChatMessage, FetchOrderOptions, MarketOffer, Offer, OfferDetails,
     OfferEdit, OfferField, OfferFieldOption, OfferFieldType, OfferSaveResponse, OrderInfo,
     OrderPage, OrderStatus, PriceCalculation, Review, ProfileReview, RaiseOffersResponse,
-    RunnerChatMessage, RunnerChatNode, RunnerObject, RunnerOrdersCounters, RunnerResponse,
-    RunnerUnknownObject, UserInfo,
+    WithdrawRequest, RunnerChatMessage, RunnerChatNode, RunnerObject, RunnerOrdersCounters,
+    RunnerResponse, RunnerUnknownObject, UserInfo,
 };
 pub use offer::OfferEditBuilder;
 pub use security::{validate_golden_key, SecureString};

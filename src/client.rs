@@ -5,7 +5,7 @@ use crate::error::GoldenPayError;
 use crate::models::{
     CategoryFilter, CategoryNode, CategorySubcategory, ChatMessage, MarketOffer, Offer,
     OfferDetails, OfferEdit, OfferSaveResponse, OrderInfo, OrderPage, PriceCalculation,
-    RunnerResponse, UserInfo, ProfileReview, RaiseOffersResponse,
+    RunnerResponse, UserInfo, ProfileReview, RaiseOffersResponse, WithdrawRequest,
 };
 use crate::offer::OfferEditBuilder;
 use crate::models::FetchOrderOptions;
@@ -496,6 +496,33 @@ impl GoldenPaySession {
         let val: serde_json::Value = response.json().await?;
         Ok(val)
     }
+
+    /// Initiates a balance withdrawal request.
+    pub async fn withdraw(
+        &self,
+        request: &WithdrawRequest,
+    ) -> Result<RunnerResponse, GoldenPayError> {
+        let payload = format!(
+            "csrf_token={}&currency={}&ext_currency={}&wallet={}&amount={}",
+            urlencoding::encode(&self.user.csrf_token),
+            urlencoding::encode(&request.currency),
+            urlencoding::encode(&request.ext_currency),
+            urlencoding::encode(&request.wallet),
+            urlencoding::encode(&format!("{}", request.amount))
+        );
+
+        let response = self
+            .post_form(
+                format!("{}/withdraw", self.urls.base()),
+                payload,
+                None::<String>,
+                "application/json, text/javascript, */*; q=0.01",
+            )
+            .await?;
+
+        Ok(parse_runner_response(response.json().await?))
+    }
+
 
 
 

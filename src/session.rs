@@ -277,6 +277,25 @@ impl SessionManager {
         self.edit_offer(node_id, offer_id, builder.build()).await
     }
 
+    /// Creates a new offer with the provided details.
+    pub async fn create_offer(
+        &mut self,
+        node_id: i64,
+        details: OfferEdit,
+    ) -> Result<OfferSaveResponse, GoldenPayError> {
+        reconnect_on_auth!(self, self.session.create_offer(node_id, details.clone()))
+    }
+
+    /// Creates a new offer using an [`OfferEditBuilder`].
+    pub async fn create_offer_with(
+        &mut self,
+        node_id: i64,
+        builder: OfferEditBuilder,
+    ) -> Result<OfferSaveResponse, GoldenPayError> {
+        self.create_offer(node_id, builder.build()).await
+    }
+
+
     /// Calculates price information for a node.
     pub async fn calc_price(
         &mut self,

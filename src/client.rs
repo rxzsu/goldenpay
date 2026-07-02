@@ -348,6 +348,36 @@ impl GoldenPaySession {
         self.edit_offer(node_id, offer_id, builder.build()).await
     }
 
+    /// Creates a new offer with the provided details.
+    pub async fn create_offer(
+        &self,
+        node_id: i64,
+        details: OfferEdit,
+    ) -> Result<OfferSaveResponse, GoldenPayError> {
+        let payload = build_offer_payload(&self.user.csrf_token, 0, node_id, &details);
+
+        let response = self
+            .post_form(
+                self.urls.offer_save(),
+                payload,
+                Some(self.urls.lots_trade(node_id)),
+                "application/json, text/javascript, */*; q=0.01",
+            )
+            .await?;
+
+        Ok(parse_offer_save_response(response.json().await?))
+    }
+
+    /// Creates a new offer using an [`OfferEditBuilder`].
+    pub async fn create_offer_with(
+        &self,
+        node_id: i64,
+        builder: OfferEditBuilder,
+    ) -> Result<OfferSaveResponse, GoldenPayError> {
+        self.create_offer(node_id, builder.build()).await
+    }
+
+
     /// Performs a lightweight health check against the home page.
     ///
     /// Returns `true` if the server responds with a success status.

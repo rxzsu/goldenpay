@@ -53,6 +53,13 @@ impl OfferEditBuilder {
         self
     }
 
+    /// Sets whether the offer should be deleted.
+    #[must_use]
+    pub fn deleted(mut self, value: bool) -> Self {
+        self.inner.deleted = Some(value);
+        self
+    }
+
     /// Consumes the builder and returns the [`OfferEdit`].
     #[must_use]
     pub fn build(self) -> OfferEdit {

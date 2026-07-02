@@ -92,6 +92,11 @@ impl SessionManager {
         self.session.check_connection().await
     }
 
+    /// Fetches the current account balance from the top navigation bar.
+    pub async fn fetch_balance(&mut self) -> Result<f64, GoldenPayError> {
+        reconnect_on_auth!(self, self.session.fetch_balance())
+    }
+
     /// Checks if the configured proxy works correctly by requesting the home page.
     pub async fn validate_proxy(&self) -> Result<bool, GoldenPayError> {
         self.client.validate_proxy().await
@@ -387,6 +392,29 @@ impl SessionManager {
         min_price: f64,
     ) -> Result<OfferSaveResponse, GoldenPayError> {
         reconnect_on_auth!(self, self.session.undercut_price(node_id, offer_id, undercut_by, min_price))
+    }
+
+    /// Deactivates all active offers for the specified node.
+    pub async fn deactivate_all_offers(&mut self, node_id: i64) -> Result<(), GoldenPayError> {
+        let offers = self.fetch_my_offers(node_id).await?;
+        let active_offers: Vec<_> = offers.into_iter().filter(|o| o.active).collect();
+        
+        for offer in active_offers {
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().active(false)).await?;
+        }
+        
+        Ok(())
+    }
+
+    /// Deletes all offers for the specified node.
+    pub async fn delete_all_offers(&mut self, node_id: i64) -> Result<(), GoldenPayError> {
+        let offers = self.fetch_my_offers(node_id).await?;
+        
+        for offer in offers {
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().deleted(true)).await?;
+        }
+        
+        Ok(())
     }
 }
 

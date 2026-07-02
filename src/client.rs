@@ -12,7 +12,7 @@ use crate::models::FetchOrderOptions;
 use crate::parser::{
     parse_category_filters, parse_category_subcategories, parse_category_tree, parse_chat_messages,
     parse_market_offers, parse_my_offers, parse_offer_details, parse_order_page, parse_orders,
-    parse_price_calculation, parse_runner_objects, parse_user, parse_profile_reviews,
+    parse_price_calculation, parse_runner_objects, parse_user, parse_profile_reviews, parse_balance,
 };
 use crate::urls::Urls;
 use crate::utils::{random_tag, retry_sleep};
@@ -388,6 +388,13 @@ impl GoldenPaySession {
             .unwrap_or(false)
     }
 
+    /// Fetches the current account balance from the top navigation bar.
+    pub async fn fetch_balance(&self) -> Result<f64, GoldenPayError> {
+        let response = self.get_html(self.urls.home()).await?;
+        let html = response.text().await?;
+        parse_balance(&html)
+    }
+
     /// Calculates price information for a node.
     pub async fn calc_price(
         &self,
@@ -615,8 +622,28 @@ impl GoldenPaySession {
         self.edit_offer(node_id, offer_id, patch).await
     }
 
+    /// Deactivates all active offers for the specified node.
+    pub async fn deactivate_all_offers(&self, node_id: i64) -> Result<(), GoldenPayError> {
+        let offers = self.fetch_my_offers(node_id).await?;
+        let active_offers: Vec<_> = offers.into_iter().filter(|o| o.active).collect();
+        
+        for offer in active_offers {
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().active(false)).await?;
+        }
+        
+        Ok(())
+    }
 
-
+    /// Deletes all offers for the specified node.
+    pub async fn delete_all_offers(&self, node_id: i64) -> Result<(), GoldenPayError> {
+        let offers = self.fetch_my_offers(node_id).await?;
+        
+        for offer in offers {
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().deleted(true)).await?;
+        }
+        
+        Ok(())
+    }
 
 
     async fn request_runner(&self, payload: String) -> Result<RunnerResponse, GoldenPayError> {

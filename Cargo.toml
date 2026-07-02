@@ -1,6 +1,6 @@
 [package]
 name = "goldenpay"
-version = "0.5.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Production-oriented Rust SDK for FunPay automation"

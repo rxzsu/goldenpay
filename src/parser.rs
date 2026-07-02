@@ -23,6 +23,20 @@ static REVIEWS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)").un
 static RATING_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"rating-(\d+(?:\.\d+)?)").unwrap());
 static SUBCAT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/(lots|chips)/(\d+)/?").unwrap());
 
+pub fn parse_balance(html: &str) -> Result<f64, GoldenPayError> {
+    let document = Html::parse_document(html);
+    let selector = Selector::parse(".badge-balance").unwrap();
+    let balance_text = document
+        .select(&selector)
+        .next()
+        .ok_or_else(|| GoldenPayError::parse("parse_balance", "balance element not found"))?
+        .text()
+        .collect::<String>();
+    
+    let clean_text = balance_text.replace(" ", "").replace("₽", "").replace("$", "").replace("€", "");
+    clean_text.parse::<f64>().map_err(|e| GoldenPayError::parse("parse_balance", e.to_string()))
+}
+
 pub fn parse_user(home_html: &str, set_cookies: &[String]) -> Result<UserInfo, GoldenPayError> {
     let document = Html::parse_document(home_html);
     let body_selector = Selector::parse("body").unwrap();

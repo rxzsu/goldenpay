@@ -2,18 +2,18 @@
 
 use crate::config::GoldenPayConfig;
 use crate::error::GoldenPayError;
+use crate::models::FetchOrderOptions;
 use crate::models::{
     CategoryFilter, CategoryNode, CategorySubcategory, ChatMessage, MarketOffer, Offer,
     OfferDetails, OfferEdit, OfferSaveResponse, OrderInfo, OrderPage, PriceCalculation,
-    RunnerResponse, UserInfo, ProfileReview, RaiseOffersResponse, WithdrawRequest,
-    StoreStatistics,
+    ProfileReview, RaiseOffersResponse, RunnerResponse, StoreStatistics, UserInfo, WithdrawRequest,
 };
 use crate::offer::OfferEditBuilder;
-use crate::models::FetchOrderOptions;
 use crate::parser::{
-    parse_category_filters, parse_category_subcategories, parse_category_tree, parse_chat_messages,
-    parse_market_offers, parse_my_offers, parse_offer_details, parse_order_page, parse_orders,
-    parse_price_calculation, parse_runner_objects, parse_user, parse_profile_reviews, parse_balance,
+    parse_balance, parse_category_filters, parse_category_subcategories, parse_category_tree,
+    parse_chat_messages, parse_market_offers, parse_my_offers, parse_offer_details,
+    parse_order_page, parse_orders, parse_price_calculation, parse_profile_reviews,
+    parse_runner_objects, parse_user,
 };
 use crate::urls::Urls;
 use crate::utils::{random_tag, retry_sleep};
@@ -109,9 +109,10 @@ impl GoldenPay {
             config: self.config.clone(),
             urls: self.urls.clone(),
             user,
-            rate_limiter: self.config.max_concurrent_requests.map(|max| {
-                Arc::new(Semaphore::new(max.get()))
-            }),
+            rate_limiter: self
+                .config
+                .max_concurrent_requests
+                .map(|max| Arc::new(Semaphore::new(max.get()))),
         })
     }
 
@@ -130,7 +131,8 @@ impl GoldenPay {
             return Ok(false);
         }
 
-        let res = self.http
+        let res = self
+            .http
             .get(self.urls.home())
             .header(USER_AGENT, &self.config.user_agent)
             .send()
@@ -178,7 +180,10 @@ impl GoldenPaySession {
 
         let mut results = Vec::with_capacity(set.len());
         while let Some(joined) = set.join_next().await {
-            results.push(joined.unwrap_or_else(|e| Err(GoldenPayError::parse("send_messages", e.to_string()))));
+            results
+                .push(joined.unwrap_or_else(|e| {
+                    Err(GoldenPayError::parse("send_messages", e.to_string()))
+                }));
         }
         results
     }
@@ -199,7 +204,9 @@ impl GoldenPaySession {
 
         let mut results = Vec::with_capacity(set.len());
         while let Some(joined) = set.join_next().await {
-            results.push(joined.unwrap_or_else(|e| Err(GoldenPayError::parse("fetch_orders_batch", e.to_string()))));
+            results.push(joined.unwrap_or_else(|e| {
+                Err(GoldenPayError::parse("fetch_orders_batch", e.to_string()))
+            }));
         }
         results
     }
@@ -255,7 +262,9 @@ impl GoldenPaySession {
         &self,
         options: &FetchOrderOptions,
     ) -> Result<Vec<OrderInfo>, GoldenPayError> {
-        self.fetch_orders().await.map(|orders| options.filter(orders))
+        self.fetch_orders()
+            .await
+            .map(|orders| options.filter(orders))
     }
 
     /// Calculates statistics for orders matching the provided options.
@@ -264,7 +273,7 @@ impl GoldenPaySession {
         options: &FetchOrderOptions,
     ) -> Result<StoreStatistics, GoldenPayError> {
         let orders = self.fetch_orders_with(options).await?;
-        
+
         let mut total_sales_volume = 0;
         let mut unique_buyers = std::collections::HashSet::new();
         let total_orders = orders.len();
@@ -331,7 +340,9 @@ impl GoldenPaySession {
         node_id: i64,
         offer_id: i64,
     ) -> Result<OfferDetails, GoldenPayError> {
-        let response = self.get_html(self.urls.offer_edit(node_id, offer_id)).await?;
+        let response = self
+            .get_html(self.urls.offer_edit(node_id, offer_id))
+            .await?;
         Ok(parse_offer_details(
             &response.text().await?,
             offer_id,
@@ -401,7 +412,6 @@ impl GoldenPaySession {
         self.create_offer(node_id, builder.build()).await
     }
 
-
     /// Performs a lightweight health check against the home page.
     ///
     /// Returns `true` if the server responds with a success status.
@@ -430,7 +440,10 @@ impl GoldenPaySession {
             format!("{price:.0}")
         } else {
             let formatted = format!("{price:.2}");
-            formatted.trim_end_matches('0').trim_end_matches('.').to_string()
+            formatted
+                .trim_end_matches('0')
+                .trim_end_matches('.')
+                .to_string()
         };
         let payload = format!("nodeId={node_id}&price={price}");
         let response = self
@@ -523,8 +536,13 @@ impl GoldenPaySession {
     }
 
     /// Fetches all received reviews from the specified user's profile.
-    pub async fn fetch_profile_reviews(&self, user_id: i64) -> Result<Vec<ProfileReview>, GoldenPayError> {
-        let response = self.get_html(format!("{}/users/{}/", self.urls.base(), user_id)).await?;
+    pub async fn fetch_profile_reviews(
+        &self,
+        user_id: i64,
+    ) -> Result<Vec<ProfileReview>, GoldenPayError> {
+        let response = self
+            .get_html(format!("{}/users/{}/", self.urls.base(), user_id))
+            .await?;
         let body = response.text().await?;
         Ok(parse_profile_reviews(&body))
     }
@@ -652,25 +670,26 @@ impl GoldenPaySession {
     pub async fn deactivate_all_offers(&self, node_id: i64) -> Result<(), GoldenPayError> {
         let offers = self.fetch_my_offers(node_id).await?;
         let active_offers: Vec<_> = offers.into_iter().filter(|o| o.active).collect();
-        
+
         for offer in active_offers {
-            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().active(false)).await?;
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().active(false))
+                .await?;
         }
-        
+
         Ok(())
     }
 
     /// Deletes all offers for the specified node.
     pub async fn delete_all_offers(&self, node_id: i64) -> Result<(), GoldenPayError> {
         let offers = self.fetch_my_offers(node_id).await?;
-        
+
         for offer in offers {
-            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().deleted(true)).await?;
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().deleted(true))
+                .await?;
         }
-        
+
         Ok(())
     }
-
 
     async fn request_runner(&self, payload: String) -> Result<RunnerResponse, GoldenPayError> {
         let response = self
@@ -689,9 +708,11 @@ impl GoldenPaySession {
         F: Fn() -> reqwest::RequestBuilder,
     {
         let _permit = match &self.rate_limiter {
-            Some(sem) => Some(sem.acquire().await.map_err(|_| {
-                GoldenPayError::parse("rate_limiter", "semaphore closed")
-            })?),
+            Some(sem) => Some(
+                sem.acquire()
+                    .await
+                    .map_err(|_| GoldenPayError::parse("rate_limiter", "semaphore closed"))?,
+            ),
             None => None,
         };
         request_with_retry(&self.config, build).await

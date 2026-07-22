@@ -376,7 +376,9 @@ impl DeliveryService {
     /// Returns the number of items still available for a product.
     #[must_use]
     pub fn remaining_items(&self, product_key: &str) -> Option<usize> {
-        self.products.get(product_key).map(|inventory| inventory.items.len())
+        self.products
+            .get(product_key)
+            .map(|inventory| inventory.items.len())
     }
 
     /// Delivers an order with deduplication via the given [`DeliveryStore`].

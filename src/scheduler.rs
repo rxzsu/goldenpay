@@ -38,17 +38,17 @@ pub enum OfferGroup {
     ///
     /// When `active_only` is `true`, only currently active offers are affected
     /// (useful for deactivation — no need to touch already inactive offers).
-    Node {
-        node_id: i64,
-        active_only: bool,
-    },
+    Node { node_id: i64, active_only: bool },
 }
 
 impl OfferGroup {
     /// Creates a group targeting all offers in a category node.
     #[must_use]
     pub fn node(node_id: i64, active_only: bool) -> Self {
-        Self::Node { node_id, active_only }
+        Self::Node {
+            node_id,
+            active_only,
+        }
     }
 
     /// Returns the category node ID.
@@ -85,7 +85,10 @@ impl ScheduleRule {
     /// Hours are in 0–23 range (24-hour clock).
     #[must_use]
     pub fn daily(start_hour: u32, end_hour: u32) -> Self {
-        Self::Daily { start_hour, end_hour }
+        Self::Daily {
+            start_hour,
+            end_hour,
+        }
     }
 
     /// Returns `true` if the current local time falls within the window.
@@ -93,7 +96,10 @@ impl ScheduleRule {
     pub fn is_active(&self) -> bool {
         let hour = Local::now().hour();
         match self {
-            Self::Daily { start_hour, end_hour } => {
+            Self::Daily {
+                start_hour,
+                end_hour,
+            } => {
                 if start_hour == end_hour {
                     return true;
                 }
@@ -211,14 +217,17 @@ mod tests {
     use super::*;
 
     fn entry(name: &str, start: u32, end: u32, action: ScheduleAction) -> ScheduleEntry {
-        ScheduleEntry::new(name, OfferGroup::node(1, true), ScheduleRule::daily(start, end), action)
+        ScheduleEntry::new(
+            name,
+            OfferGroup::node(1, true),
+            ScheduleRule::daily(start, end),
+            action,
+        )
     }
 
     #[test]
     fn no_transition_on_first_poll_without_prior_state() {
-        let mut s = OfferScheduler::new(vec![
-            entry("test", 0, 24, ScheduleAction::Activate),
-        ]);
+        let mut s = OfferScheduler::new(vec![entry("test", 0, 24, ScheduleAction::Activate)]);
         let t = s.poll();
         // First poll always reports a transition since there's no prior state
         assert!(!t.is_empty());
@@ -226,9 +235,7 @@ mod tests {
 
     #[test]
     fn stable_state_returns_no_transitions() {
-        let mut s = OfferScheduler::new(vec![
-            entry("test", 0, 24, ScheduleAction::Activate),
-        ]);
+        let mut s = OfferScheduler::new(vec![entry("test", 0, 24, ScheduleAction::Activate)]);
         let _ = s.poll(); // prime
         let t = s.poll();
         assert!(t.is_empty());

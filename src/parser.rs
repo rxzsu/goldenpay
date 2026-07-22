@@ -2,8 +2,8 @@ use crate::error::GoldenPayError;
 use crate::models::{
     CategoryFilter, CategoryFilterOption, CategoryFilterType, CategoryNode, CategorySubcategory,
     CategorySubcategoryType, ChatMessage, MarketOffer, Offer, OfferDetails, OfferEdit, OfferField,
-    OfferFieldOption, OfferFieldType, OrderInfo, OrderPage, OrderStatus, PriceCalculation, Review,
-    ProfileReview, RunnerChatMessage, RunnerChatNode, RunnerObject, RunnerOrdersCounters,
+    OfferFieldOption, OfferFieldType, OrderInfo, OrderPage, OrderStatus, PriceCalculation,
+    ProfileReview, Review, RunnerChatMessage, RunnerChatNode, RunnerObject, RunnerOrdersCounters,
     RunnerUnknownObject, UserInfo,
 };
 use crate::utils::extract_phpsessid;
@@ -13,15 +13,18 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-static AMOUNT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?i)(\d+)\s*(pcs|pieces|шт|ед)\.?").unwrap());
+static AMOUNT_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)(\d+)\s*(pcs|pieces|шт|ед)\.?").unwrap());
 static USER_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/users/(\d+)/").unwrap());
 static CHAT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/chat/(\d+)/").unwrap());
 static SUM_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([\d.,]+)\s*(\S+)").unwrap());
 static OFFER_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[?&]id=(\d+)").unwrap());
 static USER_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/users/(\d+)/?").unwrap());
 static REVIEWS_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\d+)").unwrap());
-static RATING_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"rating-(\d+(?:\.\d+)?)").unwrap());
-static SUBCAT_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/(lots|chips)/(\d+)/?").unwrap());
+static RATING_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"rating-(\d+(?:\.\d+)?)").unwrap());
+static SUBCAT_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"/(lots|chips)/(\d+)/?").unwrap());
 
 pub fn parse_balance(html: &str) -> Result<f64, GoldenPayError> {
     let document = Html::parse_document(html);
@@ -32,9 +35,15 @@ pub fn parse_balance(html: &str) -> Result<f64, GoldenPayError> {
         .ok_or_else(|| GoldenPayError::parse("parse_balance", "balance element not found"))?
         .text()
         .collect::<String>();
-    
-    let clean_text = balance_text.replace(" ", "").replace("₽", "").replace("$", "").replace("€", "");
-    clean_text.parse::<f64>().map_err(|e| GoldenPayError::parse("parse_balance", e.to_string()))
+
+    let clean_text = balance_text
+        .replace(" ", "")
+        .replace("₽", "")
+        .replace("$", "")
+        .replace("€", "");
+    clean_text
+        .parse::<f64>()
+        .map_err(|e| GoldenPayError::parse("parse_balance", e.to_string()))
 }
 
 pub fn parse_user(home_html: &str, set_cookies: &[String]) -> Result<UserInfo, GoldenPayError> {
@@ -294,9 +303,9 @@ pub fn parse_order_page(html: &str, order_id: &str) -> Result<OrderPage, GoldenP
     let (sum, currency) = sum_regex
         .captures(&sum_text)
         .map_or((0.0, String::new()), |caps| {
-            let sum = caps
-                .get(1)
-                .map_or(0.0, |m| m.as_str().replace(',', ".").parse::<f64>().unwrap_or(0.0));
+            let sum = caps.get(1).map_or(0.0, |m| {
+                m.as_str().replace(',', ".").parse::<f64>().unwrap_or(0.0)
+            });
             let currency = caps
                 .get(2)
                 .map(|m| m.as_str().to_string())
@@ -482,8 +491,10 @@ fn parse_market_seller(
         .select(&reviews_selector)
         .next()
         .map(|node| {
-            node.select(&rating_count_selector)
-                .next().map_or_else(|| node.text().collect::<String>(), |n| n.text().collect::<String>())
+            node.select(&rating_count_selector).next().map_or_else(
+                || node.text().collect::<String>(),
+                |n| n.text().collect::<String>(),
+            )
         })
         .and_then(|text| {
             REVIEWS_REGEX
@@ -505,7 +516,13 @@ fn parse_market_seller(
             })
         });
 
-    (seller_name, seller_id, seller_online, seller_reviews, seller_rating)
+    (
+        seller_name,
+        seller_id,
+        seller_online,
+        seller_reviews,
+        seller_rating,
+    )
 }
 
 pub fn parse_offer_details(html: &str, offer_id: i64, node_id: i64) -> OfferDetails {
@@ -722,9 +739,10 @@ pub fn parse_category_filters(html: &str) -> Vec<CategoryFilter> {
         };
 
         if let Some(select) = field.select(&select_selector).next() {
-            let name = select
-                .value()
-                .attr("name").map_or_else(|| field_id.to_string(), |n| n.strip_prefix("f-").unwrap_or(n).to_string());
+            let name = select.value().attr("name").map_or_else(
+                || field_id.to_string(),
+                |n| n.strip_prefix("f-").unwrap_or(n).to_string(),
+            );
             let options = select
                 .select(&option_selector)
                 .filter_map(|opt| {
@@ -765,9 +783,10 @@ pub fn parse_category_filters(html: &str) -> Vec<CategoryFilter> {
         } else if field.select(&range_box_selector).next().is_some() {
             filters.push(CategoryFilter {
                 id: field_id.to_string(),
-                name: field
-                    .select(&label_selector)
-                    .next().map_or_else(|| field_id.to_string(), |n| n.text().collect::<String>().trim().to_string()),
+                name: field.select(&label_selector).next().map_or_else(
+                    || field_id.to_string(),
+                    |n| n.text().collect::<String>().trim().to_string(),
+                ),
                 filter_type: CategoryFilterType::Range,
                 options: vec![],
             });
@@ -798,9 +817,11 @@ pub fn parse_category_filters(html: &str) -> Vec<CategoryFilter> {
 /// Returns top-level categories, each containing nested children.
 pub fn parse_category_tree(html: &str) -> Vec<CategoryNode> {
     let document = Html::parse_document(html);
-    let container = Selector::parse("div.category-list, ul.category-tree, ul.category-list").unwrap();
+    let container =
+        Selector::parse("div.category-list, ul.category-tree, ul.category-list").unwrap();
     let link_selector = Selector::parse("a[href*='/lots/'], a[href*='/chips/']").unwrap();
-    let child_container = Selector::parse("div.category-children, ul.category-children, ul.nested, ul").unwrap();
+    let child_container =
+        Selector::parse("div.category-children, ul.category-children, ul.nested, ul").unwrap();
     let re = &SUBCAT_REGEX;
 
     fn parse_children(
@@ -832,9 +853,9 @@ pub fn parse_category_tree(html: &str) -> Vec<CategoryNode> {
                 .parent()
                 .and_then(ElementRef::wrap)
                 .and_then(|elem| {
-                    elem.select(child_selector)
-                        .next()
-                        .map(|container| parse_children(&container, link_selector, child_selector, re))
+                    elem.select(child_selector).next().map(|container| {
+                        parse_children(&container, link_selector, child_selector, re)
+                    })
                 })
                 .unwrap_or_default();
 
@@ -1089,7 +1110,10 @@ mod tests {
         assert_eq!(reviews[0].buyer_username, "BuyerX");
         assert_eq!(reviews[0].buyer_id, 12345);
         assert_eq!(reviews[0].stars, 5);
-        assert_eq!(reviews[0].text.as_deref(), Some("Excellent seller! Very fast delivery."));
+        assert_eq!(
+            reviews[0].text.as_deref(),
+            Some("Excellent seller! Very fast delivery.")
+        );
         assert_eq!(reviews[0].order_id.as_deref(), Some("O999999"));
     }
 
@@ -1237,13 +1261,17 @@ mod tests {
         for _ in 0..500 {
             let payload_len = rng.random_range(0..256);
             let payload: String = (0..payload_len)
-                .map(|_| rng.random_range(char::from_u32(32).unwrap()..=char::from_u32(126).unwrap()))
+                .map(|_| {
+                    rng.random_range(char::from_u32(32).unwrap()..=char::from_u32(126).unwrap())
+                })
                 .filter(|c| c.is_ascii_graphic() || *c == ' ')
                 .collect();
 
             let (template, count) = templates[rng.random_range(0..templates.len())];
             let html = if count == 2 {
-                template.replacen("{}", &payload, 1).replacen("{}", &payload, 1)
+                template
+                    .replacen("{}", &payload, 1)
+                    .replacen("{}", &payload, 1)
             } else {
                 template.replace("{}", &payload)
             };
@@ -1283,9 +1311,13 @@ pub fn parse_profile_reviews(html: &str) -> Vec<ProfileReview> {
             .unwrap_or_default();
 
         let stars = node.select(&stars_selector).count() as i32;
-        let text = node.select(&text_selector).next().map(|n| n.text().collect::<String>().trim().to_string());
-        
-        let order_id = node.select(&order_selector)
+        let text = node
+            .select(&text_selector)
+            .next()
+            .map(|n| n.text().collect::<String>().trim().to_string());
+
+        let order_id = node
+            .select(&order_selector)
             .next()
             .and_then(|n| n.value().attr("href"))
             .and_then(|href| order_regex.captures(href))

@@ -63,4 +63,3 @@ impl Urls {
         format!("{}/chat/upload", self.base())
     }
 }
-

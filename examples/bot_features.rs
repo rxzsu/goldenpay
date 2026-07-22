@@ -6,8 +6,8 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let golden_key = std::env::var("FUNPAY_GOLDEN_KEY")
-        .unwrap_or_else(|_| "your_golden_key_here".to_string());
+    let golden_key =
+        std::env::var("FUNPAY_GOLDEN_KEY").unwrap_or_else(|_| "your_golden_key_here".to_string());
 
     // 1. Configure the client with a proxy (if available)
     let client = GoldenPay::new(
@@ -34,8 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_welcome_message("Hello! Thank you for your order. I will process it shortly.")
         .with_auto_raise(vec![12345], Some(Duration::from_secs(7200)))
         .with_sleep_schedule(
-            23,             // Sleep starts at 23:00 (11 PM)
-            7,              // Sleep ends at 07:00 (7 AM)
+            23,                   // Sleep starts at 23:00 (11 PM)
+            7,                    // Sleep ends at 07:00 (7 AM)
             vec![(12345, 67890)], // Deactivate node 12345, offer 67890 during sleep hours
         );
 
@@ -100,10 +100,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Checking competitor prices to undercut them...");
     match session
         .undercut_price(
-            12345,  // Node ID
-            67890,  // Offer ID
-            1.5,    // Undercut by 1.5 RUB
-            250.0,  // Bounded below by a minimum price of 250 RUB
+            12345, // Node ID
+            67890, // Offer ID
+            1.5,   // Undercut by 1.5 RUB
+            250.0, // Bounded below by a minimum price of 250 RUB
         )
         .await
     {
@@ -123,14 +123,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
 
                 // Auto-reply to 5-star reviews
-                if r.stars == 5 && r.text.is_some() && let Some(order_id) = r.order_id {
-                        match session
-                            .reply_to_review(&order_id, "Thank you so much for the feedback!")
-                            .await
-                        {
-                            Ok(_) => println!("Replied to order review {}", order_id),
-                            Err(e) => eprintln!("Failed to reply to review: {:?}", e),
-                        }
+                if r.stars == 5
+                    && r.text.is_some()
+                    && let Some(order_id) = r.order_id
+                {
+                    match session
+                        .reply_to_review(&order_id, "Thank you so much for the feedback!")
+                        .await
+                    {
+                        Ok(_) => println!("Replied to order review {}", order_id),
+                        Err(e) => eprintln!("Failed to reply to review: {:?}", e),
+                    }
                 }
             }
         }

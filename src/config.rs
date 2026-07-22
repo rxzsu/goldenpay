@@ -254,6 +254,9 @@ mod tests {
             .with_state_path("/tmp/state.json");
 
         assert_eq!(config.proxy.as_deref(), Some("http://proxy:8080"));
-        assert_eq!(config.state_path.as_deref().unwrap().to_str(), Some("/tmp/state.json"));
+        assert_eq!(
+            config.state_path.as_deref().unwrap().to_str(),
+            Some("/tmp/state.json")
+        );
     }
 }

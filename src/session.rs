@@ -6,7 +6,7 @@ use crate::error::GoldenPayError;
 use crate::models::{
     CategoryFilter, CategoryNode, CategorySubcategory, ChatMessage, FetchOrderOptions, MarketOffer,
     Offer, OfferDetails, OfferEdit, OfferSaveResponse, OrderInfo, OrderPage, PriceCalculation,
-    RunnerResponse, UserInfo, ProfileReview, RaiseOffersResponse, WithdrawRequest,
+    ProfileReview, RaiseOffersResponse, RunnerResponse, UserInfo, WithdrawRequest,
 };
 use crate::offer::OfferEditBuilder;
 use std::time::Duration;
@@ -156,9 +156,8 @@ impl SessionManager {
         let mut results = Vec::with_capacity(set.len());
         let mut needs_reconnect = false;
         while let Some(joined) = set.join_next().await {
-            let result = joined.unwrap_or_else(|e| {
-                Err(GoldenPayError::parse("send_messages", e.to_string()))
-            });
+            let result = joined
+                .unwrap_or_else(|e| Err(GoldenPayError::parse("send_messages", e.to_string())));
             if matches_err_unauthorized(&result) {
                 needs_reconnect = true;
             }
@@ -213,7 +212,9 @@ impl SessionManager {
         &mut self,
         options: &FetchOrderOptions,
     ) -> Result<Vec<OrderInfo>, GoldenPayError> {
-        self.fetch_orders().await.map(|orders| options.filter(orders))
+        self.fetch_orders()
+            .await
+            .map(|orders| options.filter(orders))
     }
 
     /// Calculates statistics for orders matching the provided options.
@@ -230,10 +231,7 @@ impl SessionManager {
     }
 
     /// Loads a single order page with parsed metadata and secrets.
-    pub async fn fetch_order_page(
-        &mut self,
-        order_id: &str,
-    ) -> Result<OrderPage, GoldenPayError> {
+    pub async fn fetch_order_page(&mut self, order_id: &str) -> Result<OrderPage, GoldenPayError> {
         reconnect_on_auth!(self, self.session.fetch_order_page(order_id))
     }
 
@@ -246,10 +244,7 @@ impl SessionManager {
     }
 
     /// Fetches your offers for a given node.
-    pub async fn fetch_my_offers(
-        &mut self,
-        node_id: i64,
-    ) -> Result<Vec<Offer>, GoldenPayError> {
+    pub async fn fetch_my_offers(&mut self, node_id: i64) -> Result<Vec<Offer>, GoldenPayError> {
         reconnect_on_auth!(self, self.session.fetch_my_offers(node_id))
     }
 
@@ -277,7 +272,10 @@ impl SessionManager {
         offer_id: i64,
         patch: OfferEdit,
     ) -> Result<OfferSaveResponse, GoldenPayError> {
-        reconnect_on_auth!(self, self.session.edit_offer(node_id, offer_id, patch.clone()))
+        reconnect_on_auth!(
+            self,
+            self.session.edit_offer(node_id, offer_id, patch.clone())
+        )
     }
 
     /// Applies an offer edit built through [`OfferEditBuilder`].
@@ -307,7 +305,6 @@ impl SessionManager {
     ) -> Result<OfferSaveResponse, GoldenPayError> {
         self.create_offer(node_id, builder.build()).await
     }
-
 
     /// Calculates price information for a node.
     pub async fn calc_price(
@@ -343,14 +340,15 @@ impl SessionManager {
     }
 
     /// Fetches the full category tree from the marketplace root.
-    pub async fn fetch_category_tree(
-        &mut self,
-    ) -> Result<Vec<CategoryNode>, GoldenPayError> {
+    pub async fn fetch_category_tree(&mut self) -> Result<Vec<CategoryNode>, GoldenPayError> {
         reconnect_on_auth!(self, self.session.fetch_category_tree())
     }
 
     /// Raises all offers in the specified game/category.
-    pub async fn raise_offers(&mut self, node_id: i64) -> Result<RaiseOffersResponse, GoldenPayError> {
+    pub async fn raise_offers(
+        &mut self,
+        node_id: i64,
+    ) -> Result<RaiseOffersResponse, GoldenPayError> {
         reconnect_on_auth!(self, self.session.raise_offers(node_id))
     }
 
@@ -364,7 +362,10 @@ impl SessionManager {
     }
 
     /// Fetches all received reviews from the specified user's profile.
-    pub async fn fetch_profile_reviews(&mut self, user_id: i64) -> Result<Vec<ProfileReview>, GoldenPayError> {
+    pub async fn fetch_profile_reviews(
+        &mut self,
+        user_id: i64,
+    ) -> Result<Vec<ProfileReview>, GoldenPayError> {
         reconnect_on_auth!(self, self.session.fetch_profile_reviews(user_id))
     }
 
@@ -380,7 +381,10 @@ impl SessionManager {
         file_bytes: &[u8],
         filename: &str,
     ) -> Result<serde_json::Value, GoldenPayError> {
-        reconnect_on_auth!(self, self.session.upload_chat_file(chat_id, file_bytes, filename))
+        reconnect_on_auth!(
+            self,
+            self.session.upload_chat_file(chat_id, file_bytes, filename)
+        )
     }
 
     /// Initiates a balance withdrawal request.
@@ -399,36 +403,39 @@ impl SessionManager {
         undercut_by: f64,
         min_price: f64,
     ) -> Result<OfferSaveResponse, GoldenPayError> {
-        reconnect_on_auth!(self, self.session.undercut_price(node_id, offer_id, undercut_by, min_price))
+        reconnect_on_auth!(
+            self,
+            self.session
+                .undercut_price(node_id, offer_id, undercut_by, min_price)
+        )
     }
 
     /// Deactivates all active offers for the specified node.
     pub async fn deactivate_all_offers(&mut self, node_id: i64) -> Result<(), GoldenPayError> {
         let offers = self.fetch_my_offers(node_id).await?;
         let active_offers: Vec<_> = offers.into_iter().filter(|o| o.active).collect();
-        
+
         for offer in active_offers {
-            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().active(false)).await?;
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().active(false))
+                .await?;
         }
-        
+
         Ok(())
     }
 
     /// Deletes all offers for the specified node.
     pub async fn delete_all_offers(&mut self, node_id: i64) -> Result<(), GoldenPayError> {
         let offers = self.fetch_my_offers(node_id).await?;
-        
+
         for offer in offers {
-            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().deleted(true)).await?;
+            self.edit_offer_with(node_id, offer.id, OfferEditBuilder::new().deleted(true))
+                .await?;
         }
-        
+
         Ok(())
     }
 }
 
 fn matches_err_unauthorized<T>(result: &Result<T, GoldenPayError>) -> bool {
-    matches!(
-        result,
-        Err(GoldenPayError::Unauthorized)
-    )
+    matches!(result, Err(GoldenPayError::Unauthorized))
 }

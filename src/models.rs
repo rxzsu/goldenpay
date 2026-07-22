@@ -109,8 +109,6 @@ pub struct WithdrawRequest {
     pub amount: f64,
 }
 
-
-
 /// Price breakdown including seller payout, buyer cost, and commission.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PriceCalculation {
@@ -421,29 +419,41 @@ impl FetchOrderOptions {
     #[must_use]
     pub fn matches(&self, order: &OrderInfo) -> bool {
         if let Some(status) = &self.status
-            && &order.status != status {
-                return false;
-            }
+            && &order.status != status
+        {
+            return false;
+        }
         if let Some(min) = self.min_amount
-            && order.amount < min {
-                return false;
-            }
+            && order.amount < min
+        {
+            return false;
+        }
         if let Some(max) = self.max_amount
-            && order.amount > max {
-                return false;
-            }
+            && order.amount > max
+        {
+            return false;
+        }
         if let Some(sub) = &self.subcategory
-            && &order.subcategory_name != sub {
-                return false;
-            }
+            && &order.subcategory_name != sub
+        {
+            return false;
+        }
         if let Some(buyer) = &self.buyer
-            && !order.buyer_username.to_ascii_lowercase().contains(&buyer.to_ascii_lowercase()) {
-                return false;
-            }
+            && !order
+                .buyer_username
+                .to_ascii_lowercase()
+                .contains(&buyer.to_ascii_lowercase())
+        {
+            return false;
+        }
         if let Some(desc) = &self.description
-            && !order.description.to_ascii_lowercase().contains(&desc.to_ascii_lowercase()) {
-                return false;
-            }
+            && !order
+                .description
+                .to_ascii_lowercase()
+                .contains(&desc.to_ascii_lowercase())
+        {
+            return false;
+        }
         true
     }
 
@@ -525,9 +535,21 @@ mod tests {
     #[test]
     fn description_filter_is_case_insensitive() {
         let order = sample_order("Alice", "Steam Account EU", 1);
-        assert!(FetchOrderOptions::new().description("steam").matches(&order));
-        assert!(FetchOrderOptions::new().description("account").matches(&order));
-        assert!(!FetchOrderOptions::new().description("valorant").matches(&order));
+        assert!(
+            FetchOrderOptions::new()
+                .description("steam")
+                .matches(&order)
+        );
+        assert!(
+            FetchOrderOptions::new()
+                .description("account")
+                .matches(&order)
+        );
+        assert!(
+            !FetchOrderOptions::new()
+                .description("valorant")
+                .matches(&order)
+        );
     }
 
     #[test]

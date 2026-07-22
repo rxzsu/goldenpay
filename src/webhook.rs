@@ -22,7 +22,7 @@
 //! server.run().await.unwrap();
 //! ```
 
-use crate::crypto::{hex_decode, webhook_signature, verify_hmac};
+use crate::crypto::{hex_decode, verify_hmac, webhook_signature};
 use crate::error::GoldenPayError;
 use std::collections::HashMap;
 use std::net::SocketAddr;

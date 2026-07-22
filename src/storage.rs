@@ -85,7 +85,9 @@ async fn write_atomic_json(path: &std::path::Path, raw: &str) -> Result<(), Gold
     let file_name = path
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| GoldenPayError::state(format!("invalid file name for {}", path.display())))?;
+        .ok_or_else(|| {
+            GoldenPayError::state(format!("invalid file name for {}", path.display()))
+        })?;
     let tmp_path = path.with_file_name(format!("{file_name}.tmp"));
 
     fs::write(&tmp_path, raw).await?;
@@ -101,11 +103,13 @@ pub struct SqliteStateStore {
 impl SqliteStateStore {
     /// Creates or opens a SQLite state store at the given path.
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self, GoldenPayError> {
-        let conn = rusqlite::Connection::open(path).map_err(|e| GoldenPayError::state(e.to_string()))?;
+        let conn =
+            rusqlite::Connection::open(path).map_err(|e| GoldenPayError::state(e.to_string()))?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS seen_orders (order_id TEXT PRIMARY KEY)",
             [],
-        ).map_err(|e| GoldenPayError::state(e.to_string()))?;
+        )
+        .map_err(|e| GoldenPayError::state(e.to_string()))?;
         conn.execute(
             "CREATE TABLE IF NOT EXISTS seen_messages (chat_id TEXT PRIMARY KEY, last_message_id INTEGER)",
             [],
@@ -120,17 +124,25 @@ impl SqliteStateStore {
 impl StateStore for SqliteStateStore {
     async fn load(&self) -> Result<BotState, GoldenPayError> {
         let conn = self.conn.lock().await;
-        let mut stmt_orders = conn.prepare("SELECT order_id FROM seen_orders").map_err(|e| GoldenPayError::state(e.to_string()))?;
-        let order_rows = stmt_orders.query_map([], |row| row.get::<_, String>(0)).map_err(|e| GoldenPayError::state(e.to_string()))?;
+        let mut stmt_orders = conn
+            .prepare("SELECT order_id FROM seen_orders")
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
+        let order_rows = stmt_orders
+            .query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
         let mut seen_orders = Vec::new();
         for order_id in order_rows {
             seen_orders.push(order_id.map_err(|e| GoldenPayError::state(e.to_string()))?);
         }
 
-        let mut stmt_msgs = conn.prepare("SELECT chat_id, last_message_id FROM seen_messages").map_err(|e| GoldenPayError::state(e.to_string()))?;
-        let msg_rows = stmt_msgs.query_map([], |row| {
-            Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-        }).map_err(|e| GoldenPayError::state(e.to_string()))?;
+        let mut stmt_msgs = conn
+            .prepare("SELECT chat_id, last_message_id FROM seen_messages")
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
+        let msg_rows = stmt_msgs
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+            })
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
         let mut seen_messages = std::collections::HashMap::new();
         for row in msg_rows {
             let (chat_id, msg_id) = row.map_err(|e| GoldenPayError::state(e.to_string()))?;
@@ -145,30 +157,42 @@ impl StateStore for SqliteStateStore {
 
     async fn save(&self, state: &BotState) -> Result<(), GoldenPayError> {
         let mut conn = self.conn.lock().await;
-        let tx = conn.transaction().map_err(|e| GoldenPayError::state(e.to_string()))?;
+        let tx = conn
+            .transaction()
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
 
-        tx.execute("DELETE FROM seen_orders", []).map_err(|e| GoldenPayError::state(e.to_string()))?;
-        tx.execute("DELETE FROM seen_messages", []).map_err(|e| GoldenPayError::state(e.to_string()))?;
+        tx.execute("DELETE FROM seen_orders", [])
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
+        tx.execute("DELETE FROM seen_messages", [])
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
 
         {
-            let mut insert_order = tx.prepare("INSERT INTO seen_orders (order_id) VALUES (?)").map_err(|e| GoldenPayError::state(e.to_string()))?;
+            let mut insert_order = tx
+                .prepare("INSERT INTO seen_orders (order_id) VALUES (?)")
+                .map_err(|e| GoldenPayError::state(e.to_string()))?;
             for order_id in &state.seen_orders {
-                insert_order.execute([order_id]).map_err(|e| GoldenPayError::state(e.to_string()))?;
+                insert_order
+                    .execute([order_id])
+                    .map_err(|e| GoldenPayError::state(e.to_string()))?;
             }
         }
 
         {
-            let mut insert_msg = tx.prepare("INSERT INTO seen_messages (chat_id, last_message_id) VALUES (?, ?)").map_err(|e| GoldenPayError::state(e.to_string()))?;
+            let mut insert_msg = tx
+                .prepare("INSERT INTO seen_messages (chat_id, last_message_id) VALUES (?, ?)")
+                .map_err(|e| GoldenPayError::state(e.to_string()))?;
             for (chat_id, msg_id) in &state.seen_messages {
-                insert_msg.execute(rusqlite::params![chat_id, msg_id]).map_err(|e| GoldenPayError::state(e.to_string()))?;
+                insert_msg
+                    .execute(rusqlite::params![chat_id, msg_id])
+                    .map_err(|e| GoldenPayError::state(e.to_string()))?;
             }
         }
 
-        tx.commit().map_err(|e| GoldenPayError::state(e.to_string()))?;
+        tx.commit()
+            .map_err(|e| GoldenPayError::state(e.to_string()))?;
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {

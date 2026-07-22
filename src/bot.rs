@@ -92,7 +92,11 @@ impl GoldenPayBot {
 
     /// Enables auto-raising for specified category/game node IDs with an optional interval (defaults to 2 hours).
     #[must_use]
-    pub fn with_auto_raise(mut self, node_ids: Vec<i64>, interval: Option<std::time::Duration>) -> Self {
+    pub fn with_auto_raise(
+        mut self,
+        node_ids: Vec<i64>,
+        interval: Option<std::time::Duration>,
+    ) -> Self {
         self.options.auto_raise_nodes = Some(node_ids);
         self.options.auto_raise_interval = interval;
         self
@@ -209,7 +213,9 @@ impl GoldenPayBot {
         }
 
         while let Some(joined) = set.join_next().await {
-            let Ok(Ok((chat_id, messages))) = joined else { continue; };
+            let Ok(Ok((chat_id, messages))) = joined else {
+                continue;
+            };
             let last_message_id = messages.iter().map(|m| m.id).max().unwrap_or_default();
             if last_message_id > 0 {
                 self.stream.seen_messages.insert(chat_id, last_message_id);
@@ -274,8 +280,12 @@ impl GoldenPayBot {
         }
 
         while let Some(joined) = set.join_next().await {
-            let Ok((chat_id, result, should_emit)) = joined else { continue; };
-            let Ok(messages) = result else { continue; };
+            let Ok((chat_id, result, should_emit)) = joined else {
+                continue;
+            };
+            let Ok(messages) = result else {
+                continue;
+            };
             if should_emit {
                 for message in &messages {
                     if self.stream.should_emit_message(message, &filter) {
@@ -302,7 +312,10 @@ impl GoldenPayBot {
     {
         tracing::info!("bot started");
         let token = self.cancel_token.clone();
-        let auto_raise_interval = self.options.auto_raise_interval.unwrap_or(std::time::Duration::from_secs(7200));
+        let auto_raise_interval = self
+            .options
+            .auto_raise_interval
+            .unwrap_or(std::time::Duration::from_secs(7200));
         let mut last_raise = tokio::time::Instant::now() - auto_raise_interval;
         let mut currently_sleeping = None;
 

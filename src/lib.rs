@@ -14,7 +14,7 @@
     clippy::cast_possible_wrap,
     clippy::items_after_statements,
     clippy::items_after_test_module,
-    clippy::float_cmp,
+    clippy::float_cmp
 )]
 
 pub mod automation;
@@ -43,7 +43,6 @@ pub use automation::{
     ProductInventory, ProductMatcher,
 };
 pub use bot::{GoldenPayBot, GoldenPayEvent};
-pub use session::SessionManager;
 pub use client::{GoldenPay, GoldenPaySession};
 pub use config::{GoldenPayConfig, GoldenPayConfigBuilder, RetryPolicy};
 pub use error::GoldenPayError;
@@ -52,18 +51,17 @@ pub use models::{
     CategoryFilter, CategoryFilterOption, CategoryFilterType, CategoryNode, CategorySubcategory,
     CategorySubcategoryType, ChatMessage, FetchOrderOptions, MarketOffer, Offer, OfferDetails,
     OfferEdit, OfferField, OfferFieldOption, OfferFieldType, OfferSaveResponse, OrderInfo,
-    OrderPage, OrderStatus, PriceCalculation, Review, ProfileReview, RaiseOffersResponse,
-    WithdrawRequest, RunnerChatMessage, RunnerChatNode, RunnerObject, RunnerOrdersCounters,
-    RunnerResponse, RunnerUnknownObject, UserInfo,
+    OrderPage, OrderStatus, PriceCalculation, ProfileReview, RaiseOffersResponse, Review,
+    RunnerChatMessage, RunnerChatNode, RunnerObject, RunnerOrdersCounters, RunnerResponse,
+    RunnerUnknownObject, UserInfo, WithdrawRequest,
 };
 pub use offer::OfferEditBuilder;
-pub use scheduler::{
-    OfferGroup, OfferScheduler, ScheduleAction, ScheduleEntry, ScheduleRule,
-};
-pub use security::{validate_golden_key, SecureString};
+pub use scheduler::{OfferGroup, OfferScheduler, ScheduleAction, ScheduleEntry, ScheduleRule};
+pub use security::{SecureString, validate_golden_key};
+pub use session::SessionManager;
 pub use storage::{JsonStateStore, MemoryStateStore, SqliteStateStore, StateStore};
 pub use webhook::{
-    compute_signature, WebhookConfig, WebhookEvent, WebhookHandler, WebhookPayload, WebhookServer,
+    WebhookConfig, WebhookEvent, WebhookHandler, WebhookPayload, WebhookServer, compute_signature,
 };
 
 #[doc(hidden)]

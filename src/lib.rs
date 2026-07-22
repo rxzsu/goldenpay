@@ -21,6 +21,7 @@ pub mod automation;
 pub mod bot;
 pub mod client;
 pub mod config;
+pub mod crypto;
 pub mod error;
 pub mod event;
 pub mod models;
@@ -57,7 +58,9 @@ pub use models::{
 pub use offer::OfferEditBuilder;
 pub use security::{validate_golden_key, SecureString};
 pub use storage::{JsonStateStore, MemoryStateStore, SqliteStateStore, StateStore};
-pub use webhook::{WebhookConfig, WebhookEvent, WebhookHandler, WebhookPayload, WebhookServer};
+pub use webhook::{
+    compute_signature, WebhookConfig, WebhookEvent, WebhookHandler, WebhookPayload, WebhookServer,
+};
 
 #[doc(hidden)]
 pub use parser::{parse_price_calculation, parse_runner_objects};

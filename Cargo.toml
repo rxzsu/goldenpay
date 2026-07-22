@@ -1,12 +1,12 @@
 [package]
 name = "goldenpay"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 rust-version = "1.97"
 description = "Production-oriented Rust SDK for FunPay automation"
 license = "MIT"
-repository = "https://github.com/FUXKVOB/goldenpay"
-homepage = "https://github.com/FUXKVOB/goldenpay"
+repository = "https://github.com/rxzsu/goldenpay"
+homepage = "https://github.com/rxzsu/goldenpay"
 documentation = "https://docs.rs/goldenpay"
 readme = "README.md"
 keywords = ["funpay", "sdk", "automation", "bot"]
@@ -28,6 +28,8 @@ tracing = "0.1"
 urlencoding = "2.1.3"
 rusqlite = { version = "0.32.0", features = ["bundled"] }
 chrono = { version = "0.4.39", default-features = false, features = ["clock", "std"] }
+hmac = "0.12"
+sha2 = "0.10"
 
 
 

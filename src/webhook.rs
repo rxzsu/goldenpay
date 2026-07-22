@@ -22,6 +22,7 @@
 //! server.run().await.unwrap();
 //! ```
 
+use crate::crypto::{hex_decode, webhook_signature, verify_hmac};
 use crate::error::GoldenPayError;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -38,6 +39,11 @@ pub struct WebhookConfig {
     pub endpoint: String,
     /// Maximum body size in bytes (default: 1 MB).
     pub max_body_size: usize,
+    /// Optional HMAC-SHA256 secret for verifying incoming requests.
+    ///
+    /// When set, the server reads the `X-Signature-256` header and
+    /// rejects requests with an invalid signature (401 Unauthorized).
+    pub secret: Option<String>,
 }
 
 impl Default for WebhookConfig {
@@ -46,8 +52,34 @@ impl Default for WebhookConfig {
             bind_addr: SocketAddr::from(([127, 0, 0, 1], 9090)),
             endpoint: "/webhook".to_string(),
             max_body_size: 1_048_576,
+            secret: None,
         }
     }
+}
+
+impl WebhookConfig {
+    /// Sets the HMAC secret for request verification.
+    #[must_use]
+    pub fn with_secret(mut self, secret: impl Into<String>) -> Self {
+        self.secret = Some(secret.into());
+        self
+    }
+}
+
+/// Computes the `X-Signature-256` header value for a webhook payload.
+///
+/// Use this when calling a webhook endpoint that has HMAC verification enabled:
+///
+/// ```ignore
+/// use goldenpay::webhook::compute_signature;
+///
+/// let body = r#"{"event":"new_order","id":"123"}"#;
+/// let sig = compute_signature("my-secret", body.as_bytes());
+/// // Set header: X-Signature-256: {sig}
+/// ```
+#[must_use]
+pub fn compute_signature(secret: &str, body: &[u8]) -> String {
+    webhook_signature(secret.as_bytes(), body)
 }
 
 /// A parsed webhook request with full context.
@@ -168,6 +200,23 @@ async fn handle_request(
 
     let mut body = vec![0u8; content_length];
     reader.read_exact(&mut body).await?;
+
+    // HMAC verification
+    if let Some(secret) = &config.secret {
+        let signature_header = headers
+            .get("X-Signature-256")
+            .map(|s| s.as_str())
+            .unwrap_or("");
+        let Some(signature) = hex_decode(signature_header) else {
+            send_response(&mut w, "401 Unauthorized", "Invalid signature").await?;
+            return Ok(());
+        };
+        if !verify_hmac(secret.as_bytes(), &body, &signature) {
+            send_response(&mut w, "401 Unauthorized", "Invalid signature").await?;
+            return Ok(());
+        }
+        tracing::debug!("webhook HMAC verified");
+    }
 
     let json_value: serde_json::Value = serde_json::from_slice(&body)?;
 

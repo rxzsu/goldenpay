@@ -123,8 +123,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 );
 
                 // Auto-reply to 5-star reviews
-                if r.stars == 5 && r.text.is_some() {
-                    if let Some(order_id) = r.order_id {
+                if r.stars == 5 && r.text.is_some() && let Some(order_id) = r.order_id {
                         match session
                             .reply_to_review(&order_id, "Thank you so much for the feedback!")
                             .await
@@ -132,7 +131,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Ok(_) => println!("Replied to order review {}", order_id),
                             Err(e) => eprintln!("Failed to reply to review: {:?}", e),
                         }
-                    }
                 }
             }
         }

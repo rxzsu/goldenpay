@@ -13,6 +13,7 @@
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::items_after_statements,
+    clippy::items_after_test_module,
     clippy::float_cmp,
 )]
 

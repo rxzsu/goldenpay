@@ -304,14 +304,13 @@ impl GoldenPayBot {
                 result = self.poll_once() => {
                     let events = result?;
                     for event in events {
-                        if let GoldenPayEvent::NewOrder(ref order) = event {
-                            if let Some(ref welcome_msg) = self.options.auto_welcome_message {
+                        if let GoldenPayEvent::NewOrder(ref order) = event
+                            && let Some(ref welcome_msg) = self.options.auto_welcome_message {
                                 tracing::info!(order_id = %order.id, "sending auto-welcome message");
                                 if let Err(e) = self.manager.send_message(&order.chat_id, welcome_msg).await {
                                     tracing::error!(order_id = %order.id, error = %e, "failed to send auto-welcome message");
                                 }
                             }
-                        }
                         handler(event, self.manager.session()).await?;
                     }
 
@@ -331,8 +330,10 @@ impl GoldenPayBot {
                         if currently_sleeping != Some(should_sleep) {
                             tracing::info!(should_sleep, "transitioning sleep state");
                             for &(node_id, offer_id) in offers {
-                                let mut patch = crate::models::OfferEdit::default();
-                                patch.active = Some(!should_sleep);
+                                let patch = crate::models::OfferEdit {
+                                    active: Some(!should_sleep),
+                                    ..Default::default()
+                                };
                                 match self.manager.edit_offer(node_id, offer_id, patch).await {
                                     Ok(_) => {
                                         tracing::info!(node_id, offer_id, active = !should_sleep, "updated offer state according to sleep schedule");

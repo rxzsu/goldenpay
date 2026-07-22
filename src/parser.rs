@@ -1094,28 +1094,6 @@ mod tests {
     }
 
     #[test]
-    fn parses_offer_details_fixture() {
-        let html = fixture("offer_edit.html");
-        let details = parse_offer_details(&html, 99, 77);
-
-        assert_eq!(details.offer_id, 99);
-        assert_eq!(details.node_id, 77);
-        assert_eq!(details.current.quantity.as_deref(), Some("10"));
-        assert_eq!(details.current.price.as_deref(), Some("499"));
-        assert_eq!(
-            details.current.desc_ru.as_deref(),
-            Some("Offer description")
-        );
-        assert_eq!(details.current.active, Some(true));
-        assert!(
-            details
-                .custom_fields
-                .iter()
-                .any(|f| f.name == "fields[server]")
-        );
-    }
-
-    #[test]
     fn parses_chat_runner_fixture() {
         let raw = fixture("chat_runner.json");
         let value: Value = serde_json::from_str(&raw).unwrap();

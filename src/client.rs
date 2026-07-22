@@ -641,8 +641,10 @@ impl GoldenPaySession {
             None => min_price,
         };
 
-        let mut patch = OfferEdit::default();
-        patch.price = Some(format!("{}", target_price));
+        let patch = OfferEdit {
+            price: Some(format!("{}", target_price)),
+            ..Default::default()
+        };
         self.edit_offer(node_id, offer_id, patch).await
     }
 

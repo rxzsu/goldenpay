@@ -420,36 +420,30 @@ impl FetchOrderOptions {
     /// Returns `true` if the given order matches all set filters.
     #[must_use]
     pub fn matches(&self, order: &OrderInfo) -> bool {
-        if let Some(status) = &self.status {
-            if &order.status != status {
+        if let Some(status) = &self.status
+            && &order.status != status {
                 return false;
             }
-        }
-        if let Some(min) = self.min_amount {
-            if order.amount < min {
+        if let Some(min) = self.min_amount
+            && order.amount < min {
                 return false;
             }
-        }
-        if let Some(max) = self.max_amount {
-            if order.amount > max {
+        if let Some(max) = self.max_amount
+            && order.amount > max {
                 return false;
             }
-        }
-        if let Some(sub) = &self.subcategory {
-            if &order.subcategory_name != sub {
+        if let Some(sub) = &self.subcategory
+            && &order.subcategory_name != sub {
                 return false;
             }
-        }
-        if let Some(buyer) = &self.buyer {
-            if !order.buyer_username.to_ascii_lowercase().contains(&buyer.to_ascii_lowercase()) {
+        if let Some(buyer) = &self.buyer
+            && !order.buyer_username.to_ascii_lowercase().contains(&buyer.to_ascii_lowercase()) {
                 return false;
             }
-        }
-        if let Some(desc) = &self.description {
-            if !order.description.to_ascii_lowercase().contains(&desc.to_ascii_lowercase()) {
+        if let Some(desc) = &self.description
+            && !order.description.to_ascii_lowercase().contains(&desc.to_ascii_lowercase()) {
                 return false;
             }
-        }
         true
     }
 

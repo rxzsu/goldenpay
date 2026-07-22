@@ -1,6 +1,6 @@
 //! Cryptographic utilities: HMAC-SHA256 for webhook request verification.
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, Mac, KeyInit};
 use sha2::Sha256;
 
 const HEX_CHARS: &[u8] = b"0123456789abcdef";

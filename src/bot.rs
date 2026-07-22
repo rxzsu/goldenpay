@@ -2,10 +2,11 @@
 
 use crate::error::GoldenPayError;
 use crate::event::{BotOptions, EventStream, MessageFilter};
-use chrono::{Local, Timelike};
-use crate::models::{BotState, ChatMessage, OrderInfo};
+use crate::models::{BotState, ChatMessage, OfferEdit, OrderInfo};
+use crate::scheduler::OfferScheduler;
 use crate::session::SessionManager;
 use crate::storage::{JsonStateStore, MemoryStateStore, StateStore};
+use chrono::{Local, Timelike};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
@@ -32,6 +33,7 @@ pub struct GoldenPayBot {
     options: BotOptions,
     cancel_token: CancellationToken,
     concurrency_limit: Arc<Semaphore>,
+    scheduler: Option<OfferScheduler>,
 }
 
 impl GoldenPayBot {
@@ -51,6 +53,7 @@ impl GoldenPayBot {
             options: BotOptions::default(),
             cancel_token: CancellationToken::new(),
             concurrency_limit: Arc::new(Semaphore::new(5)),
+            scheduler: None,
         }
     }
 
@@ -69,7 +72,15 @@ impl GoldenPayBot {
             options: BotOptions::default(),
             cancel_token: CancellationToken::new(),
             concurrency_limit: Arc::new(Semaphore::new(5)),
+            scheduler: None,
         }
+    }
+
+    /// Attaches an offer group scheduler for automatic activation/deactivation.
+    #[must_use]
+    pub fn with_scheduler(mut self, scheduler: OfferScheduler) -> Self {
+        self.scheduler = Some(scheduler);
+        self
     }
 
     /// Applies bot options (message filtering, etc.).
@@ -330,7 +341,7 @@ impl GoldenPayBot {
                         if currently_sleeping != Some(should_sleep) {
                             tracing::info!(should_sleep, "transitioning sleep state");
                             for &(node_id, offer_id) in offers {
-                                let patch = crate::models::OfferEdit {
+                                let patch = OfferEdit {
                                     active: Some(!should_sleep),
                                     ..Default::default()
                                 };
@@ -344,6 +355,36 @@ impl GoldenPayBot {
                                 }
                             }
                             currently_sleeping = Some(should_sleep);
+                        }
+                    }
+
+                    // Evaluate offer group scheduler
+                    if let Some(ref mut scheduler) = self.scheduler {
+                        let transitions = scheduler.poll();
+                        for (entry, should_be_active) in &transitions {
+                            let node_id = entry.group.node_id();
+                            let offers = match self.manager.fetch_my_offers(node_id).await {
+                                Ok(o) => o,
+                                Err(e) => {
+                                    tracing::error!(node_id, entry = %entry.name, error = %e, "scheduler: failed to fetch offers");
+                                    continue;
+                                }
+                            };
+                            for offer in &offers {
+                                if entry.group.active_only() && !offer.active {
+                                    continue;
+                                }
+                                if offer.active == *should_be_active {
+                                    continue;
+                                }
+                                let patch = OfferEdit {
+                                    active: Some(*should_be_active),
+                                    ..Default::default()
+                                };
+                                if let Err(e) = self.manager.edit_offer(node_id, offer.id, patch).await {
+                                    tracing::error!(offer_id = offer.id, entry = %entry.name, error = %e, "scheduler: failed to update offer");
+                                }
+                            }
                         }
                     }
 

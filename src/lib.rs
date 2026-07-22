@@ -26,6 +26,7 @@ pub mod error;
 pub mod event;
 pub mod models;
 pub mod offer;
+pub mod scheduler;
 pub mod security;
 pub mod session;
 pub mod storage;
@@ -56,6 +57,9 @@ pub use models::{
     RunnerResponse, RunnerUnknownObject, UserInfo,
 };
 pub use offer::OfferEditBuilder;
+pub use scheduler::{
+    OfferGroup, OfferScheduler, ScheduleAction, ScheduleEntry, ScheduleRule,
+};
 pub use security::{validate_golden_key, SecureString};
 pub use storage::{JsonStateStore, MemoryStateStore, SqliteStateStore, StateStore};
 pub use webhook::{

@@ -1,7 +1,1 @@
-/target
-Cargo.lock
-/.idea
-/.vscode
-*.log
-/data
-/landing
+/go/

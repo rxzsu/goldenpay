@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-08-03
+### Added
+* **Advanced Webhooks**: Introduced structured `WebhookEvent` parsing for `NewOrder` and `NewMessage` events instead of raw JSON.
+* **Review System**: Added `leave_review` endpoint for rating buyers.
+* **Order Management**: Added `refund_order` and `delete_offer` APIs.
+* **Examples**: Added `webhook_bot.rs` example to demonstrate new webhook types.
+
 ## [1.1.0] - 2026-07-23
 ### Added
 * **Webhook HMAC Verification**: Added `crypto` module with HMAC-SHA256, hex encode/decode, constant-time comparison. `WebhookConfig.secret` field + `X-Signature-256` header validation. Public `compute_signature()` helper for clients.

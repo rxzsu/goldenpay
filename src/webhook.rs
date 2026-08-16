@@ -93,12 +93,32 @@ pub struct WebhookPayload {
     pub headers: HashMap<String, String>,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NewOrderWebhook {
+    pub id: String,
+    pub amount: Option<f64>,
+    #[serde(flatten)]
+    pub extra: serde_json::Value,
+}
+
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct NewMessageWebhook {
+    pub chat_id: String,
+    pub text: Option<String>,
+    #[serde(flatten)]
+    pub extra: serde_json::Value,
+}
+
 /// An event received via the webhook endpoint.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum WebhookEvent {
-    /// A generic JSON notification.
-    Notification(WebhookPayload),
+    /// A new order notification.
+    NewOrder(NewOrderWebhook, WebhookPayload),
+    /// A new message notification.
+    NewMessage(NewMessageWebhook, WebhookPayload),
+    /// A generic JSON notification (fallback).
+    RawEvent(WebhookPayload),
 }
 
 /// Handler trait for processing webhook events.
@@ -222,11 +242,33 @@ async fn handle_request(
 
     let payload = WebhookPayload {
         source_ip: addr,
-        body: json_value,
+        body: json_value.clone(),
         headers,
     };
 
-    handler.handle(WebhookEvent::Notification(payload)).await?;
+    let event = if let Some(t) = json_value.get("type").and_then(|v| v.as_str()).or_else(|| json_value.get("event").and_then(|v| v.as_str())) {
+        match t {
+            "new_order" | "order" => {
+                if let Ok(ev) = serde_json::from_value(json_value.clone()) {
+                    WebhookEvent::NewOrder(ev, payload)
+                } else {
+                    WebhookEvent::RawEvent(payload)
+                }
+            }
+            "new_message" | "message" => {
+                if let Ok(ev) = serde_json::from_value(json_value.clone()) {
+                    WebhookEvent::NewMessage(ev, payload)
+                } else {
+                    WebhookEvent::RawEvent(payload)
+                }
+            }
+            _ => WebhookEvent::RawEvent(payload),
+        }
+    } else {
+        WebhookEvent::RawEvent(payload)
+    };
+
+    handler.handle(event).await?;
 
     send_response(&mut w, "200 OK", "OK").await
 }

@@ -28,6 +28,10 @@ impl Urls {
         format!("{}/orders/{order_id}/", self.base())
     }
 
+    pub fn orders_refund(&self) -> String {
+        format!("{}/orders/refund", self.base())
+    }
+
     pub fn offer_edit(&self, node_id: i64, offer_id: i64) -> String {
         format!(
             "{}/lots/offerEdit?node={node_id}&offer={offer_id}",

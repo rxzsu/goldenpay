@@ -297,6 +297,27 @@ impl GoldenPaySession {
         parse_order_page(&body, order_id)
     }
 
+    /// Refunds an order.
+    pub async fn refund_order(&self, order_id: &str) -> Result<RunnerResponse, GoldenPayError> {
+        let payload = format!(
+            "csrf_token={}&id={}",
+            urlencoding::encode(&self.user.csrf_token),
+            urlencoding::encode(order_id),
+        );
+
+        let response = self
+            .post_form(
+                self.urls.orders_refund(),
+                payload,
+                Some(self.urls.order_page(order_id)),
+                "application/json, text/javascript, */*; q=0.01",
+            )
+            .await?;
+
+        let val: RunnerResponse = response.json().await?;
+        Ok(val)
+    }
+
     /// Fetches messages from a chat through the runner endpoint.
     pub async fn fetch_chat_messages(
         &self,
@@ -512,7 +533,32 @@ impl GoldenPaySession {
         Ok(res)
     }
 
-    /// Sends a reply to a buyer's review for a given order.
+    /// Leaves a review for a buyer.
+    pub async fn leave_review(
+        &self,
+        order_id: &str,
+        rating: i32,
+        text: &str,
+    ) -> Result<RunnerResponse, GoldenPayError> {
+        let payload = format!(
+            "id={}&rating={}&text={}&csrf_token={}",
+            urlencoding::encode(order_id),
+            rating,
+            urlencoding::encode(text),
+            urlencoding::encode(&self.user.csrf_token)
+        );
+        let response = self
+            .post_form(
+                format!("{}/orders/review", self.urls.base()),
+                payload,
+                None::<String>,
+                "application/json, text/javascript, */*; q=0.01",
+            )
+            .await?;
+        Ok(parse_runner_response(response.json().await?))
+    }
+
+    /// Replies to a review left by a buyer.
     pub async fn reply_to_review(
         &self,
         order_id: &str,
@@ -664,6 +710,13 @@ impl GoldenPaySession {
             ..Default::default()
         };
         self.edit_offer(node_id, offer_id, patch).await
+    }
+
+    /// Deletes a specific offer by ID.
+    pub async fn delete_offer(&self, node_id: i64, offer_id: i64) -> Result<(), GoldenPayError> {
+        self.edit_offer_with(node_id, offer_id, OfferEditBuilder::new().deleted(true))
+            .await?;
+        Ok(())
     }
 
     /// Deactivates all active offers for the specified node.

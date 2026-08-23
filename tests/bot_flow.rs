@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use goldenpay::GoldenPayError;
+use goldenpay::{GoldenPayError};
 use goldenpay::{
     BotOptions, ChatMessage, DeliveryItem, DeliveryItemFormat, DeliveryMessageBuilder,
     DeliveryMessenger, DeliveryService, EventStream, ExactSubcategoryMatcher, MemoryDeliveryStore,

@@ -13,6 +13,7 @@ pub struct UserInfo {
     pub csrf_token: String,
     /// PHP session ID, if one was set during connect.
     pub phpsessid: Option<String>,
+    pub node_ids: Vec<i64>
 }
 
 impl fmt::Debug for UserInfo {

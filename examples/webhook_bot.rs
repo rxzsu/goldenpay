@@ -1,6 +1,6 @@
 use goldenpay::webhook::{WebhookConfig, WebhookEvent, WebhookHandler, WebhookServer};
 use goldenpay::GoldenPayError;
-use std::sync::Arc;
+// use std::sync::Arc;
 
 struct MyWebhookHandler;
 
@@ -23,6 +23,7 @@ impl WebhookHandler for MyWebhookHandler {
             WebhookEvent::RawEvent(raw) => {
                 println!("Received raw event: {}", raw.body);
             }
+            _ => {}
         }
         Ok(())
     }

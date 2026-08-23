@@ -75,11 +75,34 @@ pub fn parse_user(home_html: &str, set_cookies: &[String]) -> Result<UserInfo, G
         .filter(|value| !value.is_empty())
         .ok_or(GoldenPayError::Unauthorized)?;
 
+    let offers_selector = Selector::parse(".profile-data-container .mb20 div.offer").unwrap();
+    let mut node_ids: Vec<i64> = Vec::new();
+    for offer in document.select(&offers_selector) {
+        let id_selector =
+            Selector::parse(".offer-list-title-container .offer-list-title h3 a").unwrap();
+        let href = offer
+            .select(&id_selector)
+            .next()
+            .ok_or_else(|| GoldenPayError::parse("parse_user", "offer link not found"))?
+            .value()
+            .attr("href")
+            .ok_or_else(|| GoldenPayError::parse("parse_user", "no href in offer"))?;
+        let id = href
+            .trim_end_matches('/')
+            .rsplit('/')
+            .next()
+            .ok_or_else(|| GoldenPayError::parse("parse_user", "id missing in href"))?
+            .parse::<i64>()
+            .map_err(|_| GoldenPayError::parse("parse_user", "invalid id in href"))?;
+        node_ids.push(id);
+    }
+
     Ok(UserInfo {
         id: user_id,
         username,
         csrf_token,
         phpsessid: extract_phpsessid(set_cookies),
+        node_ids,
     })
 }
 
@@ -1194,6 +1217,26 @@ mod tests {
             <html>
               <body data-app-data='{"userId":111,"csrf-token":"csrf"}'>
                 <div class="user-link-name">SellerOne</div>
+                <div class="col-md-7 profile-data-container">
+                    <div class="mb20">
+                        <h5 class="mb10 text-bold">
+                            Предложения </h5>
+                        <div class="offer">
+                            <div class="offer-list-title-container">
+                                <div class="offer-list-title">
+                                    <h3><a href="https://funpay.com/lots/89/">Аккаунты с играми Steam</a></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="offer">
+                            <div class="offer-list-title-container">
+                                <div class="offer-list-title">
+                                    <h3><a href="https://funpay.com/lots/1405/">Оффлайн активации Steam</a></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
               </body>
             </html>
         "#;
@@ -1203,6 +1246,43 @@ mod tests {
         assert_eq!(user.id, 111);
         assert_eq!(user.csrf_token, "csrf");
         assert_eq!(user.phpsessid.as_deref(), Some("abc123"));
+    }
+
+    #[test]
+    fn parse_user_extracts_lots_ids() {
+        let html = r#"
+        <html>
+            <body data-app-data='{"userId":111,"csrf-token":"csrf"}'>
+                <div class="user-link-name">SellerOne</div>
+                <div class="col-md-7 profile-data-container">
+                    <div class="mb20">
+                        <h5 class="mb10 text-bold">
+                            Предложения </h5>
+                        <div class="offer">
+                            <div class="offer-list-title-container">
+                                <div class="offer-list-title">
+                                    <h3><a href="https://funpay.com/lots/89/">Аккаунты с играми Steam</a></h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="offer">
+                            <div class="offer-list-title-container">
+                                <div class="offer-list-title">
+                                    <h3><a href="https://funpay.com/lots/1405/">Оффлайн активации Steam</a></h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </body>
+        </html>"#;
+        let cookies = vec!["PHPSESSID=abc123; path=/".to_string()];
+        let user = parse_user(html, &cookies).unwrap();
+        assert_eq!(user.username, "SellerOne");
+        assert_eq!(user.id, 111);
+        assert_eq!(user.csrf_token, "csrf");
+        assert_eq!(user.phpsessid.as_deref(), Some("abc123"));
+        assert_eq!(user.node_ids, vec![89, 1405]);
     }
 
     #[test]

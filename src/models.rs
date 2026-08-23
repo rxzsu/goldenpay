@@ -23,6 +23,7 @@ impl fmt::Debug for UserInfo {
             .field("username", &self.username)
             .field("csrf_token", &"***")
             .field("phpsessid", &"***")
+            .field("node_ids", &self.node_ids)
             .finish()
     }
 }

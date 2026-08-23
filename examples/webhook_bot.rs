@@ -1,6 +1,5 @@
 use goldenpay::webhook::{WebhookConfig, WebhookEvent, WebhookHandler, WebhookServer};
 use goldenpay::GoldenPayError;
-use std::sync::Arc;
 
 struct MyWebhookHandler;
 
@@ -23,6 +22,9 @@ impl WebhookHandler for MyWebhookHandler {
             WebhookEvent::RawEvent(raw) => {
                 println!("Received raw event: {}", raw.body);
             }
+            other => {
+                println!("Unhandled event: {other:?}");
+            }
         }
         Ok(())
     }
@@ -30,8 +32,10 @@ impl WebhookHandler for MyWebhookHandler {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut config = WebhookConfig::default();
-    config.bind_addr = "127.0.0.1:8080".parse()?;
+    let config = WebhookConfig {
+        bind_addr: "127.0.0.1:8080".parse()?,
+        ..WebhookConfig::default()
+    };
 
     let handler = MyWebhookHandler;
     let server = WebhookServer::new(config, handler);

@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-08-30
+### Fixed
+* **Category Tree**: Fixed `fetch_category_tree` 404 — `Urls::lots_home` (`/lots/`) does not exist, now fetches from `/` (`home()`). `parse_category_tree` updated to support current `promo-game-list` homepage layout with fallback to legacy `category-list`.
+
 ## [1.2.0] - 2026-08-03
 ### Added
 * **Advanced Webhooks**: Introduced structured `WebhookEvent` parsing for `NewOrder` and `NewMessage` events instead of raw JSON.

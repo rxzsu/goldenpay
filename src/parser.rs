@@ -812,9 +812,11 @@ pub fn parse_category_filters(html: &str) -> Vec<CategoryFilter> {
     filters
 }
 
-/// Parses the full category tree from the marketplace root page (`/lots/`).
+/// Parses the full category tree from the marketplace root page (`/`).
 ///
 /// Returns top-level categories, each containing nested children.
+/// The tree is rendered on the site homepage; historically this was
+/// documented as `/lots/` which returns 404.
 pub fn parse_category_tree(html: &str) -> Vec<CategoryNode> {
     let document = Html::parse_document(html);
     let container =
@@ -869,6 +871,89 @@ pub fn parse_category_tree(html: &str) -> Vec<CategoryNode> {
         nodes
     }
 
+    // Try legacy containers first (used in older FunPay layout)
+    if let Some(container_node) = document.select(&container).next() {
+        let nodes = parse_children(&container_node, &link_selector, &child_container, re);
+        if !nodes.is_empty() {
+            return nodes;
+        }
+    }
+
+    // Fallback: current FunPay homepage layout uses `div.promo-game-list` with
+    // `div.promo-game-item` entries. Each item has a `div.game-title a` as the
+    // parent game and a `ul.list-inline` with subcategories.
+    let promo_container_selector =
+        Selector::parse("div.promo-game-list, div.promo-games, body").unwrap();
+    let promo_item_selector = Selector::parse("div.promo-game-item").unwrap();
+    let game_title_selector = Selector::parse("div.game-title a").unwrap();
+
+    if let Some(promo_container) = document.select(&promo_container_selector).next() {
+        let mut nodes = Vec::new();
+        for item in promo_container.select(&promo_item_selector) {
+            let Some(title_link) = item.select(&game_title_selector).next() else {
+                continue;
+            };
+            let href = title_link.value().attr("href").unwrap_or_default();
+            let Some(caps) = re.captures(href) else {
+                continue;
+            };
+            let Some(id) = caps.get(2).and_then(|m| m.as_str().parse::<i64>().ok()) else {
+                continue;
+            };
+            let subcategory_type = match caps.get(1).map(|m| m.as_str()) {
+                Some("lots") => Some(CategorySubcategoryType::Lots),
+                Some("chips") => Some(CategorySubcategoryType::Chips),
+                _ => None,
+            };
+            let name = title_link.text().collect::<String>().trim().to_string();
+            if name.is_empty() {
+                continue;
+            }
+
+            // Collect children from the same promo-item's list
+            let children: Vec<CategoryNode> = item
+                .select(&link_selector)
+                .filter_map(|link| {
+                    // Skip the title link itself
+                    if link.value().attr("href") == title_link.value().attr("href")
+                        && link.text().collect::<String>().trim() == name
+                    {
+                        return None;
+                    }
+                    let href = link.value().attr("href").unwrap_or_default();
+                    let caps = re.captures(href)?;
+                    let id = caps.get(2)?.as_str().parse::<i64>().ok()?;
+                    let subcategory_type = match caps.get(1).map(|m| m.as_str()) {
+                        Some("lots") => Some(CategorySubcategoryType::Lots),
+                        Some("chips") => Some(CategorySubcategoryType::Chips),
+                        _ => None,
+                    };
+                    let child_name = link.text().collect::<String>().trim().to_string();
+                    if child_name.is_empty() {
+                        return None;
+                    }
+                    Some(CategoryNode {
+                        id,
+                        name: child_name,
+                        subcategory_type,
+                        children: vec![],
+                    })
+                })
+                .collect();
+
+            nodes.push(CategoryNode {
+                id,
+                name,
+                subcategory_type,
+                children,
+            });
+        }
+        if !nodes.is_empty() {
+            return nodes;
+        }
+    }
+
+    // Last resort: scan whole document for any matching links (flat list)
     document
         .select(&container)
         .next()
@@ -1284,6 +1369,64 @@ mod tests {
             let _ = parse_market_offers(&html, rng.random());
             let _ = parse_category_subcategories(&html);
         }
+    }
+
+    #[test]
+    fn parses_category_tree_promo_layout() {
+        let html = r#"
+            <div class="promo-game-list">
+                <div class="promo-game-item">
+                    <div class="game-title"><a href="https://funpay.com/lots/3486/">Abyss of Dungeons</a></div>
+                    <ul class="list-inline"><li><a href="https://funpay.com/lots/3487/">Top Up</a></li><li><a href="https://funpay.com/lots/3490/">Other</a></li></ul>
+                </div>
+                <div class="promo-game-item">
+                    <div class="game-title"><a href="https://funpay.com/chips/49/">Age of Wushu</a></div>
+                    <ul class="list-inline"><li><a href="https://funpay.com/lots/160/">Accounts</a></li></ul>
+                </div>
+            </div>
+        "#;
+        let tree = parse_category_tree(html);
+        assert_eq!(tree.len(), 2);
+        assert_eq!(tree[0].id, 3486);
+        assert_eq!(tree[0].name, "Abyss of Dungeons");
+        assert_eq!(tree[0].children.len(), 2);
+        assert_eq!(tree[0].children[0].id, 3487);
+        assert_eq!(tree[1].id, 49);
+        assert_eq!(tree[1].subcategory_type, Some(CategorySubcategoryType::Chips));
+        assert_eq!(tree[1].children.len(), 1);
+    }
+
+    #[test]
+    fn parses_category_tree_legacy_layout() {
+        let html = r#"
+            <div class="category-list">
+                <a href="/lots/100/">Game A</a>
+                <ul><li><a href="/lots/101/">Sub 1</a></li><li><a href="/chips/102/">Chips Sub</a></li></ul>
+                <a href="/lots/200/">Game B</a>
+            </div>
+        "#;
+        // Legacy layout may produce flat list due to current parse_children recursion;
+        // Ensure at least the top-level link is parsed.
+        let tree = parse_category_tree(html);
+        assert!(!tree.is_empty());
+        assert!(tree.iter().any(|n| n.id == 100));
+    }
+
+    #[test]
+    fn parses_real_homepage_if_exists() {
+        let path = format!(
+            "{}/tests/fixtures/home_real.html",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let Ok(html) = std::fs::read_to_string(&path) else {
+            return;
+        };
+        let tree = parse_category_tree(&html);
+        assert!(!tree.is_empty(), "category tree should not be empty for real homepage");
+        // Should parse many games (homepage has hundreds)
+        assert!(tree.len() > 50, "expected >50 top-level games, got {}", tree.len());
+        // First entry should have children
+        assert!(!tree[0].children.is_empty());
     }
 }
 

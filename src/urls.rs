@@ -51,8 +51,12 @@ impl Urls {
         format!("{}/lots/{node_id}/", self.base())
     }
 
+    #[allow(dead_code)]
     pub fn lots_home(&self) -> String {
-        format!("{}/lots/", self.base())
+        // NOTE: `/lots/` does not exist on FunPay (404). The marketplace category
+        // tree is rendered on the site root `/`, so `lots_home` is an alias to `home()`
+        // for backward compatibility. Prefer `home()` for new code.
+        self.home()
     }
 
     pub fn lots_calc(&self) -> String {

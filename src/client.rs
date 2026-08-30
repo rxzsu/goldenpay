@@ -496,9 +496,11 @@ impl GoldenPaySession {
         Ok(parse_category_filters(&response.text().await?))
     }
 
-    /// Fetches the full category tree from the marketplace root.
+    /// Fetches the full category tree from the marketplace root (`/`).
     pub async fn fetch_category_tree(&self) -> Result<Vec<CategoryNode>, GoldenPayError> {
-        let response = self.get_html(self.urls.lots_home()).await?;
+        // `Urls::lots_home` is now an alias to `home()` because `/lots/` returns 404.
+        // Using `home()` directly is more explicit.
+        let response = self.get_html(self.urls.home()).await?;
         Ok(parse_category_tree(&response.text().await?))
     }
 
